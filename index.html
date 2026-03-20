@@ -1,0 +1,655 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Zamboni Jousting: Sideswipe</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <style>
+        body, html {
+            margin: 0; padding: 0; width: 100%; height: 100%;
+            overflow: hidden; background-color: #050510;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            touch-action: none; /* Crucial for mobile games */
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        /* Master wrapper that handles forced landscape rotation */
+        #main-wrapper {
+            position: absolute;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            overflow: hidden;
+        }
+
+        #game-container {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+        }
+        
+        /* UI Layer */
+        #ui-layer {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            pointer-events: none; display: flex; flex-direction: column;
+            z-index: 100; /* Ensure UI is always above touch controls */
+        }
+        .interactive { pointer-events: auto; }
+        
+        /* Mobile Controls */
+        #mobile-controls {
+            position: absolute; bottom: 0; left: 0; width: 100%; height: 50%;
+            pointer-events: none; display: none; z-index: 50;
+        }
+        .touch-zone { position: absolute; pointer-events: auto; }
+        #joystick-area { left: 0; top: 0; width: 50%; height: 100%; }
+        #action-area { right: 0; top: 0; width: 50%; height: 100%; display: flex; justify-content: flex-end; align-items: flex-end; padding: 20px; gap: 20px;}
+        
+        .control-btn {
+            width: 80px; height: 80px; border-radius: 50%;
+            background: rgba(255,255,255,0.1); border: 2px solid rgba(255,255,255,0.3);
+            display: flex; justify-content: center; align-items: center;
+            color: white; font-weight: bold; font-size: 14px;
+            backdrop-filter: blur(4px); transition: background 0.1s;
+        }
+        .control-btn.active { background: rgba(255,255,255,0.4); transform: scale(0.95); }
+        
+        #joystick-base {
+            position: absolute; width: 120px; height: 120px; border-radius: 50%;
+            background: rgba(255,255,255,0.05); border: 2px solid rgba(255,255,255,0.1);
+            transform: translate(-50%, -50%); display: none; pointer-events: none;
+        }
+        #joystick-stick {
+            position: absolute; width: 50px; height: 50px; border-radius: 50%;
+            background: rgba(255,255,255,0.4); transform: translate(-50%, -50%);
+            box-shadow: 0 0 10px rgba(255,255,255,0.5); pointer-events: none;
+        }
+
+        /* Boost Meters */
+        .boost-meter-container {
+            width: 150px; height: 10px; background: rgba(0,0,0,0.5);
+            border-radius: 5px; overflow: hidden; border: 1px solid rgba(255,255,255,0.2);
+        }
+        .boost-fill { height: 100%; width: 100%; transition: width 0.1s linear; }
+
+        /* Neon UI text */
+        .neon-text { text-shadow: 0 0 10px currentColor, 0 0 20px currentColor; }
+        .glass-panel { background: rgba(15, 20, 35, 0.85); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.1); }
+        
+        @media (max-width: 768px) {
+            .desktop-hint { display: none; }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Main Wrapper handles forced rotation -->
+    <div id="main-wrapper">
+        <div id="game-container"></div>
+
+        <div id="ui-layer">
+            
+            <!-- HUD -->
+            <div id="hud" class="w-full p-4 flex justify-between items-start hidden transition-opacity duration-500 z-10">
+                <!-- P1 Stats -->
+                <div class="flex flex-col gap-2">
+                    <div class="flex items-center gap-4 glass-panel p-3 rounded-xl border-l-4 border-red-500 shadow-[0_0_15px_rgba(239,68,68,0.5)]">
+                        <span class="text-red-400 font-bold text-xl uppercase tracking-wider neon-text">P1</span>
+                        <span id="score1" class="text-white font-black text-4xl">0</span>
+                    </div>
+                    <div class="boost-meter-container"><div id="boost1" class="boost-fill bg-red-500"></div></div>
+                </div>
+                
+                <div id="round-message" class="text-white font-black text-4xl md:text-6xl uppercase tracking-widest text-center transform scale-150 opacity-0 transition-all duration-300 neon-text" style="color: #fff;">
+                    FIGHT!
+                </div>
+
+                <!-- P2 Stats -->
+                <div class="flex flex-col gap-2 items-end">
+                    <div class="flex items-center gap-4 glass-panel p-3 rounded-xl border-r-4 border-blue-500 shadow-[0_0_15px_rgba(59,130,246,0.5)]">
+                        <span id="score2" class="text-white font-black text-4xl">0</span>
+                        <span class="text-blue-400 font-bold text-xl uppercase tracking-wider neon-text">P2 (AI)</span>
+                    </div>
+                    <div class="boost-meter-container"><div id="boost2" class="boost-fill bg-blue-500"></div></div>
+                </div>
+            </div>
+
+            <!-- Main Menu -->
+            <div id="main-menu" class="interactive flex-1 flex flex-col justify-center items-center bg-black bg-opacity-60 backdrop-blur-sm z-20">
+                <div class="glass-panel p-8 md:p-12 rounded-3xl border border-gray-700 shadow-2xl flex flex-col items-center text-center max-w-lg w-[90%]">
+                    <h1 class="text-4xl md:text-6xl font-black text-transparent bg-clip-text bg-gradient-to-r from-red-500 via-purple-500 to-blue-500 mb-2 uppercase tracking-tighter" style="filter: drop-shadow(0 0 10px rgba(168,85,247,0.5));">
+                        Zamboni
+                    </h1>
+                    <h2 class="text-2xl md:text-3xl font-bold text-white mb-6 tracking-widest uppercase neon-text" style="color: #e2e8f0;">Sideswipe</h2>
+                    
+                    <p class="text-gray-400 mb-8 text-sm md:text-base">
+                        Rocket-powered ice resurfacers. Fly, spin, and pierce the opponent's engine block! First to 5 wins.
+                    </p>
+
+                    <button onclick="startGame()" class="w-full bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-bold py-4 px-8 rounded-xl text-xl transition transform hover:scale-105 shadow-[0_0_20px_rgba(99,102,241,0.6)] border-b-4 border-indigo-900 mb-6 cursor-pointer">
+                        PLAY VS AI
+                    </button>
+
+                    <div class="text-xs md:text-sm text-gray-500 desktop-hint bg-gray-900 p-4 rounded-lg w-full">
+                        <strong class="text-gray-300 block mb-2">Desktop Controls:</strong>
+                        A / D : Drive & Rotate mid-air<br>
+                        W / SPACE : Jump<br>
+                        SHIFT : Rocket Boost
+                    </div>
+                    <div class="text-xs text-gray-400 mt-4 md:hidden">
+                        Touch controls will appear automatically once playing.
+                    </div>
+                </div>
+            </div>
+
+            <!-- Game Over Screen -->
+            <div id="game-over" class="interactive flex-1 flex flex-col justify-center items-center bg-black bg-opacity-80 backdrop-blur-md z-20 hidden">
+                <div class="glass-panel p-10 rounded-3xl flex flex-col items-center text-center">
+                    <h1 id="winner-text" class="text-5xl md:text-7xl font-black text-white mb-8 tracking-wider uppercase drop-shadow-[0_0_20px_currentColor]">RED WINS!</h1>
+                    <button onclick="returnToMenu()" class="bg-gray-700 hover:bg-gray-600 text-white font-bold py-3 px-10 rounded-xl text-xl transition transform hover:scale-105 shadow-lg border-b-4 border-gray-800 cursor-pointer">
+                        Main Menu
+                    </button>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Mobile Touch Controls -->
+        <div id="mobile-controls">
+            <div id="joystick-area" class="touch-zone">
+                <div id="joystick-base"><div id="joystick-stick"></div></div>
+            </div>
+            <div id="action-area" class="touch-zone">
+                <div id="btn-boost" class="control-btn" style="box-shadow: 0 0 15px rgba(239,68,68,0.5); border-color: #ef4444;">BOOST</div>
+                <div id="btn-jump" class="control-btn" style="box-shadow: 0 0 15px rgba(59,130,246,0.5); border-color: #3b82f6;">JUMP</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- 1. GAME CONSTANTS & STATE ---
+        const GAME = {
+            state: 'MENU',
+            width: window.innerWidth, // Adjusted dynamically by handleResize
+            height: window.innerHeight,
+            maxScore: 5,
+            arena: { width: 40, height: 25 },
+            gravity: 0.012,
+            dt: 1
+        };
+
+        const INPUT = {
+            left: false, right: false, jump: false, boost: false,
+            joyX: 0, joyY: 0
+        };
+
+        const UI = {
+            wrapper: document.getElementById('main-wrapper'),
+            menu: document.getElementById('main-menu'),
+            hud: document.getElementById('hud'),
+            gameOver: document.getElementById('game-over'),
+            score1: document.getElementById('score1'),
+            score2: document.getElementById('score2'),
+            boost1: document.getElementById('boost1'),
+            boost2: document.getElementById('boost2'),
+            msg: document.getElementById('round-message'),
+            winnerText: document.getElementById('winner-text'),
+            mobileControls: document.getElementById('mobile-controls')
+        };
+
+        const isMobileDevice = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0) || (window.innerWidth <= 768);
+
+        // --- FORCED LANDSCAPE LOGIC ---
+        let isRotated = false;
+        let physicalW = window.innerWidth;
+        let physicalH = window.innerHeight;
+        let camera, renderer;
+
+        function handleResize() {
+            physicalW = window.innerWidth;
+            physicalH = window.innerHeight;
+            
+            // If device is held in portrait mode, force it to display landscape
+            if (physicalH > physicalW) {
+                isRotated = true;
+                UI.wrapper.style.width = physicalH + 'px';
+                UI.wrapper.style.height = physicalW + 'px';
+                UI.wrapper.style.transform = 'rotate(90deg)';
+                UI.wrapper.style.transformOrigin = 'top left';
+                UI.wrapper.style.left = physicalW + 'px';
+                GAME.width = physicalH;
+                GAME.height = physicalW;
+            } else {
+                isRotated = false;
+                UI.wrapper.style.width = '100%';
+                UI.wrapper.style.height = '100%';
+                UI.wrapper.style.transform = 'none';
+                UI.wrapper.style.transformOrigin = '50% 50%';
+                UI.wrapper.style.left = '0px';
+                GAME.width = physicalW;
+                GAME.height = physicalH;
+            }
+
+            if (camera && renderer) {
+                camera.aspect = GAME.width / GAME.height;
+                camera.updateProjectionMatrix();
+                renderer.setSize(GAME.width, GAME.height);
+            }
+        }
+
+        // Apply initially before setting up Three.js
+        window.addEventListener('resize', handleResize);
+        handleResize();
+
+
+        // --- 2. THREE.JS SETUP ---
+        const container = document.getElementById('game-container');
+        const scene = new THREE.Scene();
+        scene.fog = new THREE.FogExp2(0x050510, 0.015);
+
+        camera = new THREE.PerspectiveCamera(35, GAME.width / GAME.height, 0.1, 1000);
+        camera.position.set(0, 10, 45);
+        camera.lookAt(0, 8, 0);
+
+        renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+        renderer.setSize(GAME.width, GAME.height);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        renderer.toneMapping = THREE.ACESFilmicToneMapping;
+        renderer.toneMappingExposure = 1.2;
+        container.appendChild(renderer.domElement);
+
+        const ambientLight = new THREE.AmbientLight(0x202040, 1.5);
+        scene.add(ambientLight);
+        
+        const dirLight = new THREE.DirectionalLight(0xffffff, 0.5);
+        dirLight.position.set(0, 20, 10);
+        scene.add(dirLight);
+
+        // --- 3. ENVIRONMENT BUILDER ---
+        const arenaGroup = new THREE.Group();
+        scene.add(arenaGroup);
+
+        const floorGeo = new THREE.BoxGeometry(GAME.arena.width * 2, 2, 20);
+        const floorMat = new THREE.MeshStandardMaterial({ 
+            color: 0x0a1525, roughness: 0.1, metalness: 0.8,
+            emissive: 0x001122, emissiveIntensity: 0.5
+        });
+        const floor = new THREE.Mesh(floorGeo, floorMat);
+        floor.position.y = -1;
+        arenaGroup.add(floor);
+
+        const gridGeo = new THREE.PlaneGeometry(GAME.arena.width*2, 20);
+        const gridMat = new THREE.MeshBasicMaterial({ color: 0x3b82f6, wireframe: true, transparent: true, opacity: 0.2 });
+        const grid = new THREE.Mesh(gridGeo, gridMat);
+        grid.rotation.x = -Math.PI / 2;
+        grid.position.y = 0.01;
+        arenaGroup.add(grid);
+
+        const wallGeo = new THREE.BoxGeometry(GAME.arena.width * 2, GAME.arena.height * 2, 2);
+        const wallMat = new THREE.MeshStandardMaterial({ color: 0x050510, roughness: 0.8 });
+        const wall = new THREE.Mesh(wallGeo, wallMat);
+        wall.position.set(0, GAME.arena.height, -8);
+        arenaGroup.add(wall);
+
+        // --- 4. PARTICLE SYSTEM ---
+        const particles = [];
+        const particleGeo = new THREE.BoxGeometry(0.4, 0.4, 0.4);
+        
+        function spawnParticles(x, y, color, count, speed = 1, life = 40) {
+            const mat = new THREE.MeshBasicMaterial({ color: color });
+            for(let i=0; i<count; i++) {
+                const mesh = new THREE.Mesh(particleGeo, mat);
+                mesh.position.set(x + (Math.random()-0.5), y + (Math.random()-0.5), 0);
+                scene.add(mesh);
+                particles.push({
+                    mesh: mesh,
+                    vx: (Math.random() - 0.5) * speed,
+                    vy: (Math.random() - 0.5) * speed,
+                    vz: (Math.random() - 0.5) * speed * 0.5,
+                    life: life, maxLife: life
+                });
+            }
+        }
+
+        function updateParticles() {
+            for (let i = particles.length - 1; i >= 0; i--) {
+                const p = particles[i];
+                p.mesh.position.x += p.vx; p.mesh.position.y += p.vy; p.mesh.position.z += p.vz;
+                p.mesh.rotation.x += p.vx; p.mesh.rotation.y += p.vy;
+                p.life--;
+                p.mesh.scale.setScalar(p.life / p.maxLife);
+                if (p.life <= 0) {
+                    scene.remove(p.mesh);
+                    particles.splice(i, 1);
+                }
+            }
+        }
+
+        // --- 5. ENTITY CLASSES ---
+        class Zamboni {
+            constructor(isP1, colorHex) {
+                this.isP1 = isP1;
+                this.color = colorHex;
+                this.pos = new THREE.Vector2(isP1 ? -15 : 15, 0);
+                this.vel = new THREE.Vector2(0, 0);
+                this.angle = isP1 ? 0 : Math.PI;
+                this.angularVel = 0;
+                this.radius = 1.8;
+                this.isGrounded = false;
+                this.boostFuel = 100;
+                this.score = 0;
+                
+                this.accel = 0.04;
+                this.airAccel = 0.01;
+                this.jumpForce = 0.45;
+                this.boostForce = 0.035;
+                this.turnSpeed = 0.12;
+                this.buildMesh();
+            }
+
+            buildMesh() {
+                this.group = new THREE.Group();
+                const bodyMat = new THREE.MeshStandardMaterial({ color: this.color, roughness: 0.3, metalness: 0.5 });
+                const darkMat = new THREE.MeshStandardMaterial({ color: 0x222222, roughness: 0.9 });
+                const glowMat = new THREE.MeshBasicMaterial({ color: this.color }); 
+                const metalMat = new THREE.MeshStandardMaterial({ color: 0xaaaaaa, roughness: 0.2, metalness: 0.8 });
+
+                const body = new THREE.Mesh(new THREE.BoxGeometry(3.5, 1.5, 2), bodyMat);
+                body.position.y = 1.0; this.group.add(body);
+
+                const tank = new THREE.Mesh(new THREE.BoxGeometry(2.5, 1.2, 1.8), bodyMat);
+                tank.position.set(-0.3, 2.3, 0); this.group.add(tank);
+
+                const seat = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1.6), darkMat);
+                seat.position.set(-1.2, 1.8, 0); this.group.add(seat);
+
+                const wheelGeo = new THREE.CylinderGeometry(0.5, 0.5, 0.4, 16);
+                wheelGeo.rotateX(Math.PI / 2);
+                [[-1.2, 0.5, 1.1], [1.2, 0.5, 1.1], [-1.2, 0.5, -1.1], [1.2, 0.5, -1.1]].forEach(pos => {
+                    const w = new THREE.Mesh(wheelGeo, darkMat); w.position.set(...pos); this.group.add(w);
+                });
+
+                const cond = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.5, 2.4), darkMat);
+                cond.position.set(-2, 0.25, 0); this.group.add(cond);
+
+                const lanceGroup = new THREE.Group();
+                lanceGroup.position.set(1.75, 1.0, 0);
+                
+                const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 4), metalMat);
+                pole.rotation.z = -Math.PI / 2; pole.position.x = 2; lanceGroup.add(pole);
+                
+                const tip = new THREE.Mesh(new THREE.ConeGeometry(0.3, 1, 8), glowMat);
+                tip.rotation.z = -Math.PI / 2; tip.position.x = 4.5; lanceGroup.add(tip);
+
+                this.lanceLength = 6.25; 
+                this.group.add(lanceGroup);
+                
+                const light = new THREE.PointLight(this.color, 1, 10);
+                light.position.set(0, 2, 2); this.group.add(light);
+                scene.add(this.group);
+            }
+
+            reset() {
+                this.pos.set(this.isP1 ? -15 : 15, 0);
+                this.vel.set(0, 0);
+                this.angle = this.isP1 ? 0 : Math.PI;
+                this.angularVel = 0;
+                this.boostFuel = 100;
+                this.updateMesh();
+            }
+
+            getLanceTip() {
+                const cosA = Math.cos(this.angle); const sinA = Math.sin(this.angle);
+                return new THREE.Vector2(this.pos.x + cosA * this.lanceLength, this.pos.y + 1.0 + sinA * this.lanceLength);
+            }
+
+            update(inputLeft, inputRight, inputJump, inputBoost) {
+                if (GAME.state !== 'PLAYING') return;
+
+                let driveInput = 0;
+                if (inputLeft) driveInput -= 1;
+                if (inputRight) driveInput += 1;
+
+                if (this.isGrounded) {
+                    this.vel.x += driveInput * this.accel;
+                    this.vel.x *= 0.92;
+                    this.angle = Math.abs(this.angle) > Math.PI/2 ? Math.PI : 0;
+                    this.angularVel = 0;
+                    if (inputJump) {
+                        this.vel.y = this.jumpForce; this.isGrounded = false;
+                        spawnParticles(this.pos.x, 0, 0xffffff, 10, 0.2, 20); 
+                    }
+                } else {
+                    if (driveInput !== 0) this.angularVel += driveInput * -0.015; 
+                    else this.angularVel *= 0.9;
+                    
+                    this.angle += this.angularVel;
+                    this.angularVel *= 0.95; 
+                    this.vel.x += driveInput * this.airAccel;
+                    this.vel.y -= GAME.gravity;
+                }
+
+                if (inputBoost && this.boostFuel > 0) {
+                    this.boostFuel -= 1;
+                    const cosA = Math.cos(this.angle); const sinA = Math.sin(this.angle);
+                    this.vel.x += cosA * this.boostForce; this.vel.y += sinA * this.boostForce;
+                    if (Math.random() < 0.6) {
+                        spawnParticles(this.pos.x - cosA * 2, this.pos.y + 1 - sinA * 2, this.color, 2, 0.4, 15);
+                    }
+                } else if (this.isGrounded) {
+                    this.boostFuel = Math.min(100, this.boostFuel + 0.5);
+                }
+
+                this.pos.add(this.vel);
+
+                if (this.pos.y < 0) { this.pos.y = 0; this.vel.y = 0; this.isGrounded = true; } 
+                else { this.isGrounded = false; }
+                if (this.pos.y > GAME.arena.height) { this.pos.y = GAME.arena.height; this.vel.y *= -0.5; }
+                if (this.pos.x < -GAME.arena.width) { this.pos.x = -GAME.arena.width; this.vel.x *= -0.5; }
+                if (this.pos.x > GAME.arena.width) { this.pos.x = GAME.arena.width; this.vel.x *= -0.5; }
+
+                while(this.angle > Math.PI) this.angle -= Math.PI*2;
+                while(this.angle < -Math.PI) this.angle += Math.PI*2;
+                this.updateMesh();
+            }
+
+            updateMesh() {
+                this.group.position.x = this.pos.x;
+                this.group.position.y = this.pos.y;
+                this.group.rotation.z = this.angle;
+            }
+        }
+
+        let p1, p2;
+
+        function runAI(ai, opponent) {
+            let left = false, right = false, jump = false, boost = false;
+            const dx = opponent.pos.x - ai.pos.x; const dy = opponent.pos.y - ai.pos.y;
+            const dist = Math.hypot(dx, dy);
+
+            if (ai.isGrounded) {
+                if (dx > 2) right = true; else if (dx < -2) left = true;
+                if (opponent.pos.y > 4 && dist < 15 && Math.random() < 0.05) jump = true;
+                if (dist < 10 && Math.random() < 0.02) jump = true;
+            } else {
+                let targetAngle = Math.atan2(dy, dx);
+                let diff = targetAngle - ai.angle;
+                while (diff < -Math.PI) diff += Math.PI * 2;
+                while (diff > Math.PI) diff -= Math.PI * 2;
+
+                if (diff > 0.2) left = true; else if (diff < -0.2) right = true; 
+                if (Math.abs(diff) < 0.5 && dist > 5 && ai.boostFuel > 20) boost = true;
+            }
+            ai.update(left, right, jump, boost);
+        }
+
+        // --- 6. GAME LOGIC ---
+        function initGame() {
+            if(p1) { scene.remove(p1.group); scene.remove(p2.group); }
+            p1 = new Zamboni(true, 0xef4444); p2 = new Zamboni(false, 0x3b82f6); 
+        }
+
+        function startGame() {
+            initGame();
+            GAME.state = 'PLAYING';
+            p1.score = 0; p2.score = 0;
+            updateHUD();
+            
+            UI.menu.classList.add('hidden');
+            UI.gameOver.classList.add('hidden');
+            UI.hud.classList.remove('hidden');
+
+            if (isMobileDevice) { UI.mobileControls.style.display = 'block'; }
+            startRound("FIGHT!");
+        }
+
+        function startRound(msgText) {
+            GAME.state = 'ROUND_OVER'; p1.reset(); p2.reset();
+            particles.forEach(p => scene.remove(p.mesh)); particles.length = 0;
+            showMsg(msgText);
+            setTimeout(() => { hideMsg(); GAME.state = 'PLAYING'; }, 1500);
+        }
+
+        function showMsg(text) { UI.msg.innerText = text; UI.msg.style.opacity = 1; UI.msg.style.transform = "scale(1)"; }
+        function hideMsg() { UI.msg.style.opacity = 0; UI.msg.style.transform = "scale(1.5)"; }
+
+        function endGame(winnerName, colorHex) {
+            GAME.state = 'GAME_OVER';
+            UI.winnerText.innerText = `${winnerName} WINS!`; UI.winnerText.style.color = colorHex;
+            UI.gameOver.classList.remove('hidden'); UI.mobileControls.style.display = 'none';
+        }
+
+        function returnToMenu() {
+            GAME.state = 'MENU';
+            UI.gameOver.classList.add('hidden'); UI.hud.classList.add('hidden'); UI.menu.classList.remove('hidden');
+            UI.mobileControls.style.display = 'none';
+        }
+
+        function updateHUD() {
+            UI.score1.innerText = p1.score; UI.score2.innerText = p2.score;
+            UI.boost1.style.width = `${p1.boostFuel}%`; UI.boost2.style.width = `${p2.boostFuel}%`;
+        }
+
+        function checkCollisions() {
+            if (GAME.state !== 'PLAYING') return;
+            const t1 = p1.getLanceTip(); const t2 = p2.getLanceTip();
+
+            if (t1.distanceTo(t2) < 1.5) {
+                p1.vel.x = -Math.cos(p1.angle) * 0.5; p1.vel.y = -Math.sin(p1.angle) * 0.5;
+                p2.vel.x = -Math.cos(p2.angle) * 0.5; p2.vel.y = -Math.sin(p2.angle) * 0.5;
+                spawnParticles((t1.x+t2.x)/2, (t1.y+t2.y)/2, 0xffffff, 20, 0.8);
+                camera.position.x = (Math.random() - 0.5); camera.position.y = 10 + (Math.random() - 0.5);
+                return;
+            }
+
+            const c1 = new THREE.Vector2(p1.pos.x, p1.pos.y + 1); const c2 = new THREE.Vector2(p2.pos.x, p2.pos.y + 1);
+            const hit1 = t1.distanceTo(c2) < p2.radius; const hit2 = t2.distanceTo(c1) < p1.radius;
+
+            if (hit1 && hit2) {
+                spawnParticles(c1.x, c1.y, p1.color, 30, 1.0); spawnParticles(c2.x, c2.y, p2.color, 30, 1.0);
+                startRound("DRAW!");
+            } else if (hit1) {
+                spawnParticles(c2.x, c2.y, p2.color, 40, 1.2); p1.score++;
+                if (p1.score >= GAME.maxScore) endGame("RED", "#ef4444"); else startRound("P1 SCORES!");
+            } else if (hit2) {
+                spawnParticles(c1.x, c1.y, p1.color, 40, 1.2); p2.score++;
+                if (p2.score >= GAME.maxScore) endGame("BLUE", "#3b82f6"); else startRound("P2 SCORES!");
+            }
+
+            if (!hit1 && !hit2 && c1.distanceTo(c2) < (p1.radius + p2.radius)*0.8) {
+                const push = (p1.pos.x - p2.pos.x) > 0 ? 0.2 : -0.2;
+                p1.vel.x += push; p2.vel.x -= push;
+                spawnParticles((c1.x+c2.x)/2, (c1.y+c2.y)/2, 0xaaaaaa, 5, 0.3);
+            }
+            
+            camera.position.x += (0 - camera.position.x) * 0.1;
+            camera.position.y += (10 - camera.position.y) * 0.1;
+        }
+
+        // --- 7. INPUT HANDLING ---
+
+        window.addEventListener('keydown', e => {
+            if (e.code === 'KeyA') INPUT.left = true; if (e.code === 'KeyD') INPUT.right = true;
+            if (e.code === 'KeyW' || e.code === 'Space') INPUT.jump = true; if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') INPUT.boost = true;
+        });
+        window.addEventListener('keyup', e => {
+            if (e.code === 'KeyA') INPUT.left = false; if (e.code === 'KeyD') INPUT.right = false;
+            if (e.code === 'KeyW' || e.code === 'Space') INPUT.jump = false; if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') INPUT.boost = false;
+        });
+
+        // Helper to translate touch inputs seamlessly if screen is artificially rotated
+        function getMappedTouch(touch) {
+            if (!isRotated) return { clientX: touch.clientX, clientY: touch.clientY };
+            return {
+                clientX: touch.clientY,
+                clientY: physicalW - touch.clientX
+            };
+        }
+
+        const joyBase = document.getElementById('joystick-base');
+        const joyStick = document.getElementById('joystick-stick');
+        const joyArea = document.getElementById('joystick-area');
+        let joyActive = false; let joyOrigin = {x: 0, y: 0};
+
+        joyArea.addEventListener('touchstart', e => {
+            e.preventDefault();
+            const touch = getMappedTouch(e.changedTouches[0]);
+            joyActive = true; joyOrigin.x = touch.clientX; joyOrigin.y = touch.clientY;
+            
+            joyBase.style.display = 'block';
+            joyBase.style.left = touch.clientX + 'px'; joyBase.style.top = touch.clientY + 'px';
+            joyStick.style.left = '50%'; joyStick.style.top = '50%';
+        });
+
+        joyArea.addEventListener('touchmove', e => {
+            e.preventDefault();
+            if (!joyActive) return;
+            const touch = getMappedTouch(e.changedTouches[0]);
+            const dx = touch.clientX - joyOrigin.x; const dy = touch.clientY - joyOrigin.y;
+            
+            const maxR = 40; const dist = Math.hypot(dx, dy);
+            let nx = dx, ny = dy;
+            if (dist > maxR) { nx = (dx / dist) * maxR; ny = (dy / dist) * maxR; }
+            
+            joyStick.style.transform = `translate(calc(-50% + ${nx}px), calc(-50% + ${ny}px))`;
+            INPUT.left = dx < -20; INPUT.right = dx > 20;
+        });
+
+        function endJoy(e) { e.preventDefault(); joyActive = false; joyBase.style.display = 'none'; INPUT.left = false; INPUT.right = false; }
+        joyArea.addEventListener('touchend', endJoy); joyArea.addEventListener('touchcancel', endJoy);
+
+        const btnJump = document.getElementById('btn-jump'); const btnBoost = document.getElementById('btn-boost');
+        function bindBtn(el, actionName) {
+            el.addEventListener('touchstart', (e) => { e.preventDefault(); INPUT[actionName] = true; el.classList.add('active'); });
+            el.addEventListener('touchend', (e) => { e.preventDefault(); INPUT[actionName] = false; el.classList.remove('active'); });
+            el.addEventListener('touchcancel', (e) => { e.preventDefault(); INPUT[actionName] = false; el.classList.remove('active'); });
+        }
+        bindBtn(btnJump, 'jump'); bindBtn(btnBoost, 'boost');
+
+        // --- 8. MAIN LOOP ---
+        function animate() {
+            requestAnimationFrame(animate);
+            if (GAME.state === 'PLAYING' || GAME.state === 'ROUND_OVER') {
+                p1.update(INPUT.left, INPUT.right, INPUT.jump, INPUT.boost);
+                runAI(p2, p1);
+                checkCollisions(); updateHUD();
+            }
+            updateParticles();
+
+            if(p1 && p2) {
+                const midX = (p1.pos.x + p2.pos.x) / 2; const midY = (p1.pos.y + p2.pos.y) / 2;
+                camera.position.x += (midX * 0.3 - camera.position.x) * 0.05;
+                camera.position.y += (Math.max(10, midY + 5) - camera.position.y) * 0.05;
+                camera.lookAt(camera.position.x, Math.max(8, midY), 0);
+            }
+            renderer.render(scene, camera);
+        }
+
+        initGame();
+        animate();
+
+    </script>
+</body>
+</html>
+
+
