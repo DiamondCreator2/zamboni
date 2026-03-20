@@ -38,12 +38,20 @@
         
         /* Mobile Controls */
         #mobile-controls {
-            position: absolute; bottom: 0; left: 0; width: 100%; height: 50%;
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
             pointer-events: none; display: none; z-index: 50;
         }
         .touch-zone { position: absolute; pointer-events: auto; }
+        
+        /* Joystick area covers the ENTIRE left half of the screen */
         #joystick-area { left: 0; top: 0; width: 50%; height: 100%; }
-        #action-area { right: 0; top: 0; width: 50%; height: 100%; display: flex; justify-content: flex-end; align-items: flex-end; padding: 20px; gap: 20px;}
+        
+        /* Action area covers the ENTIRE right half, buttons pushed to bottom right */
+        #action-area { 
+            right: 0; top: 0; width: 50%; height: 100%; 
+            display: flex; justify-content: flex-end; align-items: flex-end; 
+            padding: 40px 30px; gap: 20px;
+        }
         
         .control-btn {
             width: 80px; height: 80px; border-radius: 50%;
@@ -199,7 +207,24 @@
 
         const isMobileDevice = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0) || (window.innerWidth <= 768);
 
-        // --- FORCED LANDSCAPE LOGIC ---
+        // --- FULLSCREEN & ORIENTATION LOGIC ---
+        function requestFullscreenAndLock() {
+            const elem = document.documentElement;
+            
+            if (elem.requestFullscreen) {
+                elem.requestFullscreen().catch((err) => console.log("Fullscreen blocked:", err));
+            } else if (elem.webkitRequestFullscreen) { /* Safari */
+                elem.webkitRequestFullscreen().catch((err) => console.log("Fullscreen blocked:", err));
+            } else if (elem.msRequestFullscreen) { /* IE11 */
+                elem.msRequestFullscreen().catch((err) => console.log("Fullscreen blocked:", err));
+            }
+
+            if (screen.orientation && screen.orientation.lock) {
+                screen.orientation.lock('landscape').catch((err) => console.log("Orientation lock blocked:", err));
+            }
+        }
+
+        // --- FORCED LANDSCAPE LOGIC (CSS Fallback) ---
         let isRotated = false;
         let physicalW = window.innerWidth;
         let physicalH = window.innerHeight;
@@ -237,7 +262,6 @@
             }
         }
 
-        // Apply initially before setting up Three.js
         window.addEventListener('resize', handleResize);
         handleResize();
 
@@ -490,6 +514,10 @@
         }
 
         function startGame() {
+            if (isMobileDevice) {
+                requestFullscreenAndLock();
+            }
+
             initGame();
             GAME.state = 'PLAYING';
             p1.score = 0; p2.score = 0;
@@ -579,52 +607,108 @@
 
         // Helper to translate touch inputs seamlessly if screen is artificially rotated
         function getMappedTouch(touch) {
-            if (!isRotated) return { clientX: touch.clientX, clientY: touch.clientY };
+            if (!isRotated) return { clientX: touch.clientX, clientY: touch.clientY, identifier: touch.identifier };
             return {
                 clientX: touch.clientY,
-                clientY: physicalW - touch.clientX
+                clientY: physicalW - touch.clientX,
+                identifier: touch.identifier
             };
         }
 
         const joyBase = document.getElementById('joystick-base');
         const joyStick = document.getElementById('joystick-stick');
         const joyArea = document.getElementById('joystick-area');
-        let joyActive = false; let joyOrigin = {x: 0, y: 0};
+        
+        let joyActive = false; 
+        let joyOrigin = {x: 0, y: 0};
+        let joyTouchId = null;
 
         joyArea.addEventListener('touchstart', e => {
             e.preventDefault();
+            // Prevent grabbing a second finger if we are already tracking one for the joystick
+            if (joyActive) return; 
+            
             const touch = getMappedTouch(e.changedTouches[0]);
-            joyActive = true; joyOrigin.x = touch.clientX; joyOrigin.y = touch.clientY;
+            joyTouchId = touch.identifier;
+            joyActive = true; 
+            joyOrigin.x = touch.clientX; 
+            joyOrigin.y = touch.clientY;
             
             joyBase.style.display = 'block';
-            joyBase.style.left = touch.clientX + 'px'; joyBase.style.top = touch.clientY + 'px';
-            joyStick.style.left = '50%'; joyStick.style.top = '50%';
+            joyBase.style.left = touch.clientX + 'px'; 
+            joyBase.style.top = touch.clientY + 'px';
+            
+            // Critical reset to center the stick visually under the thumb immediately
+            joyStick.style.left = '50%'; 
+            joyStick.style.top = '50%';
+            joyStick.style.transform = `translate(-50%, -50%)`;
         });
 
         joyArea.addEventListener('touchmove', e => {
             e.preventDefault();
             if (!joyActive) return;
-            const touch = getMappedTouch(e.changedTouches[0]);
-            const dx = touch.clientX - joyOrigin.x; const dy = touch.clientY - joyOrigin.y;
             
-            const maxR = 40; const dist = Math.hypot(dx, dy);
+            // Find the exact touch we are tracking
+            let touch = null;
+            for(let i=0; i < e.changedTouches.length; i++) {
+                if(e.changedTouches[i].identifier === joyTouchId) {
+                    touch = getMappedTouch(e.changedTouches[i]);
+                    break;
+                }
+            }
+            if(!touch) return; // Right thumb moving around shouldn't affect the joystick
+
+            const dx = touch.clientX - joyOrigin.x; 
+            const dy = touch.clientY - joyOrigin.y;
+            
+            const maxR = 40; 
+            const dist = Math.hypot(dx, dy);
             let nx = dx, ny = dy;
-            if (dist > maxR) { nx = (dx / dist) * maxR; ny = (dy / dist) * maxR; }
+            
+            if (dist > maxR) { 
+                nx = (dx / dist) * maxR; 
+                ny = (dy / dist) * maxR; 
+            }
             
             joyStick.style.transform = `translate(calc(-50% + ${nx}px), calc(-50% + ${ny}px))`;
-            INPUT.left = dx < -20; INPUT.right = dx > 20;
+            INPUT.left = dx < -20; 
+            INPUT.right = dx > 20;
         });
 
-        function endJoy(e) { e.preventDefault(); joyActive = false; joyBase.style.display = 'none'; INPUT.left = false; INPUT.right = false; }
-        joyArea.addEventListener('touchend', endJoy); joyArea.addEventListener('touchcancel', endJoy);
+        function endJoy(e) { 
+            if (!joyActive) return;
+            
+            // Only stop if the tracked thumb is lifted
+            let trackedTouchLifted = false;
+            for(let i=0; i < e.changedTouches.length; i++) {
+                if(e.changedTouches[i].identifier === joyTouchId) {
+                    trackedTouchLifted = true;
+                    break;
+                }
+            }
+            if (!trackedTouchLifted) return;
 
-        const btnJump = document.getElementById('btn-jump'); const btnBoost = document.getElementById('btn-boost');
+            e.preventDefault(); 
+            joyActive = false; 
+            joyTouchId = null;
+            joyBase.style.display = 'none'; 
+            INPUT.left = false; 
+            INPUT.right = false; 
+        }
+        
+        joyArea.addEventListener('touchend', endJoy); 
+        joyArea.addEventListener('touchcancel', endJoy);
+
+        const btnJump = document.getElementById('btn-jump'); 
+        const btnBoost = document.getElementById('btn-boost');
+        
         function bindBtn(el, actionName) {
             el.addEventListener('touchstart', (e) => { e.preventDefault(); INPUT[actionName] = true; el.classList.add('active'); });
             el.addEventListener('touchend', (e) => { e.preventDefault(); INPUT[actionName] = false; el.classList.remove('active'); });
             el.addEventListener('touchcancel', (e) => { e.preventDefault(); INPUT[actionName] = false; el.classList.remove('active'); });
         }
-        bindBtn(btnJump, 'jump'); bindBtn(btnBoost, 'boost');
+        bindBtn(btnJump, 'jump'); 
+        bindBtn(btnBoost, 'boost');
 
         // --- 8. MAIN LOOP ---
         function animate() {
