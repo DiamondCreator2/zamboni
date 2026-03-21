@@ -3,13 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Zamboni Jousting: Sideswipe</title>
+    <title>Zamboni Jousting</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <style>
         body, html {
             margin: 0; padding: 0; width: 100%; 
-            height: 100%; height: 100dvh; /* Dynamic viewport height fixes URL bar clipping */
+            height: 100%; height: 100dvh; 
             overflow: hidden; background-color: #050510;
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             touch-action: none; 
@@ -26,7 +26,7 @@
         }
 
         #game-container {
-            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 0;
         }
         
         #ui-layer {
@@ -79,6 +79,11 @@
         .neon-text { text-shadow: 0 0 10px currentColor, 0 0 20px currentColor; }
         .glass-panel { background: rgba(15, 20, 35, 0.75); backdrop-filter: blur(8px); border: 1px solid rgba(255,255,255,0.1); }
         
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: rgba(0,0,0,0.2); border-radius: 4px; }
+        ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.4); }
+
         @media (max-width: 768px) {
             .desktop-hint { display: none; }
         }
@@ -87,49 +92,53 @@
 <body>
 
     <div id="main-wrapper">
+        <!-- Main Game Background 3D Canvas -->
         <div id="game-container"></div>
 
         <div id="ui-layer">
             
             <!-- Global Pucks Display -->
-            <div id="pucks-display" class="interactive absolute top-4 right-4 flex items-center gap-2 glass-panel px-4 py-2 rounded-full border border-yellow-500 shadow-[0_0_15px_rgba(234,179,8,0.4)] z-50 transition-opacity duration-300" style="top: max(16px, env(safe-area-inset-top)); right: max(16px, env(safe-area-inset-right));">
-                <div class="w-6 h-6 bg-black rounded-full border-2 border-gray-600 shadow-inner flex justify-center items-center">
-                    <div class="w-4 h-4 bg-gray-800 rounded-full border border-gray-700"></div>
+            <div id="pucks-display" class="absolute top-0 right-0 z-50 pointer-events-auto transition-opacity duration-300" style="padding-top: max(16px, env(safe-area-inset-top)); padding-right: max(16px, env(safe-area-inset-right));">
+                <div class="flex items-center gap-3 glass-panel px-4 py-2 sm:py-3 rounded-xl border-b-4 border-yellow-500 shadow-[0_0_15px_rgba(234,179,8,0.4)]">
+                    <div class="w-5 h-5 sm:w-6 sm:h-6 bg-black rounded-full border-2 border-gray-600 shadow-inner flex justify-center items-center">
+                        <div class="w-2.5 h-2.5 sm:w-3 sm:h-3 bg-gray-800 rounded-full border border-gray-700"></div>
+                    </div>
+                    <span class="text-yellow-400 font-bold text-sm sm:text-lg tracking-wider leading-none">PUCKS:</span>
+                    <span id="pucks-count" class="text-white font-black text-lg sm:text-xl leading-none">0</span>
                 </div>
-                <span class="text-yellow-400 font-bold text-lg tracking-wider">PUCKS:</span>
-                <span id="pucks-count" class="text-white font-black text-xl">0</span>
             </div>
 
             <!-- In-Game HUD -->
-            <div id="hud" class="w-full p-4 flex justify-between items-start hidden transition-opacity duration-500 z-10" style="padding-top: max(16px, env(safe-area-inset-top)); padding-left: max(16px, env(safe-area-inset-left)); padding-right: max(16px, env(safe-area-inset-right));">
-                <div class="flex flex-col gap-2">
+            <div id="hud" class="absolute top-0 left-0 w-full flex justify-between items-start hidden transition-opacity duration-500 z-10 pointer-events-none" style="padding: max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) 0 max(16px, env(safe-area-inset-left));">
+                <div class="flex flex-col gap-2 pointer-events-auto">
                     <div id="p1-panel" class="flex items-center gap-4 glass-panel p-3 rounded-xl border-l-4 transition-all duration-300" style="border-color: #ef4444; box-shadow: 0 0 15px rgba(239,68,68,0.5);">
-                        <span id="p1-label" class="font-bold text-xl uppercase tracking-wider neon-text" style="color: #ef4444;">P1</span>
-                        <span id="score1" class="text-white font-black text-4xl">0</span>
+                        <span id="p1-label" class="font-bold text-xl uppercase tracking-wider neon-text leading-none" style="color: #ef4444;">P1</span>
+                        <span id="score1" class="text-white font-black text-3xl leading-none">0</span>
                     </div>
                     <div class="boost-meter-container"><div id="boost1" class="boost-fill bg-red-500"></div></div>
                 </div>
                 
-                <div id="round-message" class="text-white font-black text-4xl md:text-6xl uppercase tracking-widest text-center transform scale-150 opacity-0 transition-all duration-300 neon-text" style="color: #fff;">
-                    FIGHT!
-                </div>
-
-                <div class="flex flex-col gap-2 items-end">
+                <div class="flex flex-col gap-2 items-end pointer-events-auto">
                     <div class="flex items-center gap-4 glass-panel p-3 rounded-xl border-r-4 border-blue-500 shadow-[0_0_15px_rgba(59,130,246,0.5)]">
-                        <span id="score2" class="text-white font-black text-4xl">0</span>
-                        <span class="text-blue-400 font-bold text-xl uppercase tracking-wider neon-text">P2 (AI)</span>
+                        <span id="score2" class="text-white font-black text-3xl leading-none">0</span>
+                        <span class="text-blue-400 font-bold text-xl uppercase tracking-wider neon-text leading-none">P2 (AI)</span>
                     </div>
                     <div class="boost-meter-container"><div id="boost2" class="boost-fill bg-blue-500"></div></div>
                 </div>
             </div>
+            
+            <!-- Round Messages -->
+            <div id="round-message" class="absolute inset-0 flex items-center justify-center pointer-events-none z-20">
+                <span id="round-text" class="text-white font-black text-5xl md:text-7xl uppercase tracking-widest text-center transform scale-150 opacity-0 transition-all duration-300 neon-text" style="color: #fff;">FIGHT!</span>
+            </div>
 
-            <!-- Main Menu (Compact) -->
-            <div id="main-menu" class="interactive absolute inset-0 flex flex-col justify-end pb-24 items-center z-20 transition-opacity duration-300 pointer-events-none">
-                <div class="glass-panel p-6 rounded-3xl border border-gray-700 shadow-2xl flex flex-col items-center text-center max-w-sm w-[90%] pointer-events-auto">
+            <!-- Main Menu (Top Aligned) -->
+            <div id="main-menu" class="absolute inset-0 flex justify-center items-start z-20 transition-opacity duration-300 pointer-events-none" style="padding-top: max(16px, env(safe-area-inset-top));">
+                <div class="glass-panel p-6 rounded-3xl border border-gray-700 shadow-2xl flex flex-col items-center text-center max-w-sm w-[90%] pointer-events-auto mt-4 sm:mt-0">
                     <h1 class="text-4xl md:text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-red-500 via-purple-500 to-blue-500 mb-1 uppercase tracking-tighter" style="filter: drop-shadow(0 0 8px rgba(168,85,247,0.5));">
                         Zamboni
                     </h1>
-                    <h2 class="text-xl md:text-2xl font-bold text-white mb-6 tracking-widest uppercase neon-text" style="color: #e2e8f0;">Sideswipe</h2>
+                    <h2 class="text-2xl md:text-3xl font-bold text-white mb-6 tracking-widest uppercase neon-text" style="color: #e2e8f0;">Jousting</h2>
                     
                     <button onclick="startGame()" class="w-full bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-bold py-3 px-6 rounded-xl text-lg transition transform hover:scale-105 shadow-[0_0_20px_rgba(99,102,241,0.6)] border-b-4 border-indigo-900 mb-3 cursor-pointer">
                         PLAY VS AI
@@ -148,41 +157,53 @@
                 </div>
             </div>
 
-            <!-- Zamboni Shop -->
-            <div id="shop-menu" class="interactive absolute inset-0 flex-col md:flex-row bg-black bg-opacity-70 backdrop-blur-md z-40 hidden transition-opacity duration-300">
+            <!-- Zamboni Shop (With dedicated 2nd 3D renderer overlay) -->
+            <div id="shop-menu" class="absolute inset-0 bg-black bg-opacity-80 backdrop-blur-md z-40 hidden flex-col md:flex-row transition-opacity duration-300 pointer-events-none">
                 
-                <button onclick="closeShop()" class="absolute z-50 pointer-events-auto bg-gray-800 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-xl transition border-b-4 border-gray-900 cursor-pointer shadow-lg flex items-center gap-2" style="top: max(24px, env(safe-area-inset-top)); left: max(24px, env(safe-area-inset-left));">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 20 20" fill="currentColor">
-                        <path fill-rule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clip-rule="evenodd" />
-                    </svg>
-                    BACK
-                </button>
-
-                <!-- Left Side: Info -->
-                <div class="w-full md:w-1/2 h-1/2 md:h-full flex items-center justify-center p-6 pt-24 md:pt-6 pointer-events-none">
-                    <div class="glass-panel p-8 rounded-3xl flex flex-col w-full max-w-sm pointer-events-auto border border-gray-700 shadow-2xl">
-                        <h1 class="text-2xl font-bold text-gray-400 mb-1">ZAMBONI SHOP</h1>
-                        <h2 id="shop-item-name" class="text-5xl font-black mb-4 drop-shadow-md uppercase">NAME</h2>
-                        <div class="bg-gray-900 bg-opacity-60 p-5 rounded-xl border border-gray-800 mb-8 min-h-[100px] flex items-center shadow-inner">
-                            <p id="shop-item-desc" class="text-gray-300 italic text-lg leading-relaxed text-center w-full">Desc</p>
-                        </div>
-                        <div id="shop-item-action"></div>
-                    </div>
-                </div>
-
-                <!-- Right Side: 3D Car Placeholder & Arrows -->
-                <div class="w-full md:w-1/2 h-1/2 md:h-full flex items-center justify-between px-4 md:px-12 pointer-events-none">
-                    <button onclick="prevShopItem()" class="pointer-events-auto bg-black bg-opacity-60 hover:bg-opacity-90 text-white rounded-full w-14 h-14 flex items-center justify-center border-2 border-gray-500 transition transform hover:scale-110 shadow-[0_0_15px_rgba(0,0,0,0.8)] cursor-pointer">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="w-8 h-8" viewBox="0 0 20 20" fill="currentColor">
+                <!-- Shop Header -->
+                <div class="absolute top-0 left-0 w-full flex justify-start items-start z-50 pointer-events-none" style="padding: max(16px, env(safe-area-inset-top)) 0 0 max(16px, env(safe-area-inset-left));">
+                    <button onclick="closeShop()" class="pointer-events-auto glass-panel px-4 sm:px-5 py-2 sm:py-3 rounded-xl border-b-4 border-gray-700 hover:bg-gray-800 text-white font-bold transition flex items-center gap-2 shadow-lg leading-none text-sm sm:text-base">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 sm:w-5 sm:h-5" viewBox="0 0 20 20" fill="currentColor">
                             <path fill-rule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clip-rule="evenodd" />
                         </svg>
+                        BACK
                     </button>
-                    <div class="flex-1"></div>
-                    <button onclick="nextShopItem()" class="pointer-events-auto bg-black bg-opacity-60 hover:bg-opacity-90 text-white rounded-full w-14 h-14 flex items-center justify-center border-2 border-gray-500 transition transform hover:scale-110 shadow-[0_0_15px_rgba(0,0,0,0.8)] cursor-pointer">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="w-8 h-8" viewBox="0 0 20 20" fill="currentColor">
-                            <path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd" />
-                        </svg>
-                    </button>
+                </div>
+
+                <!-- True Side-by-Side Flexbox Layout -->
+                <div class="flex flex-row w-full h-full max-w-6xl mx-auto items-center pt-16 pb-4">
+                    
+                    <!-- Left Side: Info Card -->
+                    <div class="w-[45%] h-full flex items-center justify-end pr-2 sm:pr-8 pointer-events-none">
+                        <div class="glass-panel p-4 sm:p-8 rounded-3xl flex flex-col w-full max-w-sm pointer-events-auto border border-gray-700 shadow-2xl">
+                            <h1 class="text-sm sm:text-xl font-bold text-gray-400 mb-1">ZAMBONI SHOP</h1>
+                            <h2 id="shop-item-name" class="text-3xl sm:text-5xl font-black mb-2 sm:mb-4 uppercase">NAME</h2>
+                            <div class="bg-gray-900 bg-opacity-60 p-3 sm:p-5 rounded-xl border border-gray-800 mb-4 sm:mb-6 min-h-[60px] sm:min-h-[90px] flex items-center shadow-inner">
+                                <p id="shop-item-desc" class="text-gray-300 italic text-xs sm:text-base leading-relaxed text-center w-full">Desc</p>
+                            </div>
+                            <div id="shop-item-action"></div>
+                        </div>
+                    </div>
+
+                    <!-- Right Side: Secondary 3D Scene Overlay & Navigation Arrows -->
+                    <div class="w-[55%] h-full max-h-[500px] relative flex items-center justify-between px-2 sm:px-6 pointer-events-none">
+                        
+                        <button onclick="prevShopItem()" class="pointer-events-auto bg-black bg-opacity-60 hover:bg-opacity-90 text-white rounded-full w-10 h-10 sm:w-14 sm:h-14 flex items-center justify-center border-2 border-gray-500 transition transform hover:scale-110 shadow-[0_0_15px_rgba(0,0,0,0.8)] cursor-pointer z-10">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6 sm:w-8 sm:h-8" viewBox="0 0 20 20" fill="currentColor">
+                                <path fill-rule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clip-rule="evenodd" />
+                            </svg>
+                        </button>
+                        
+                        <!-- Dedicated DOM container for the Shop's 3D Renderer -->
+                        <div id="shop-3d-container" class="absolute inset-0 w-full h-full z-0 pointer-events-none"></div>
+                        
+                        <button onclick="nextShopItem()" class="pointer-events-auto bg-black bg-opacity-60 hover:bg-opacity-90 text-white rounded-full w-10 h-10 sm:w-14 sm:h-14 flex items-center justify-center border-2 border-gray-500 transition transform hover:scale-110 shadow-[0_0_15px_rgba(0,0,0,0.8)] cursor-pointer z-10">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6 sm:w-8 sm:h-8" viewBox="0 0 20 20" fill="currentColor">
+                                <path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd" />
+                            </svg>
+                        </button>
+
+                    </div>
                 </div>
             </div>
 
@@ -211,9 +232,11 @@
     </div>
 
     <script>
+        const sleep = ms => new Promise(r => setTimeout(r, ms));
+
         // --- 1. GAME CONSTANTS & STATE ---
         const GAME = {
-            state: 'MENU',
+            state: 'MENU', // MENU, SHOP, PLAYING, ROUND_OVER, GAME_OVER
             width: window.innerWidth,
             height: window.innerHeight,
             maxScore: 5,
@@ -241,13 +264,17 @@
             p1Label: document.getElementById('p1-label'),
             boost1: document.getElementById('boost1'),
             boost2: document.getElementById('boost2'),
-            msg: document.getElementById('round-message'),
+            msgContainer: document.getElementById('round-message'),
+            msgText: document.getElementById('round-text'),
             winnerText: document.getElementById('winner-text'),
             rewardText: document.getElementById('reward-text'),
             mobileControls: document.getElementById('mobile-controls')
         };
 
         const isMobileDevice = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0) || (window.innerWidth <= 768);
+
+        // Track the current round sequence to prevent overlapping countdowns
+        let currentRoundId = 0;
 
         // --- 1.5 PLAYER DATA & SHOP SYSTEM ---
         const PLAYER_DATA = {
@@ -257,9 +284,9 @@
         };
 
         const SHOP_ITEMS = [
-            { id: 'Broker', name: 'Broker', cost: 0, color: '#ef4444', desc: 'Looks like you got the leftovers.' },
+            { id: 'Broker', name: 'Broker', cost: 0, color: '#ef4444', desc: 'Looks like you got leftovers. NO! I wasn’t talking to you Zach.' },
             { id: 'Biff', name: 'Biff', cost: 15, color: '#f59e0b', desc: 'He likes to biff people. Keep him away from the hockey pucks though.' },
-            { id: 'Charlie', name: 'Charlie', cost: 50, color: '#10b981', desc: 'Looks like the rich kid cooking up a victory.' }
+            { id: 'Charlie', name: 'Charlie', cost: 50, color: '#10b981', desc: 'Looks like the rich kid is cooking up a victory. No, he’s not cooking bacon Zach.' }
         ];
 
         let currentShopIndex = 0;
@@ -284,13 +311,13 @@
             
             const actionContainer = document.getElementById('shop-item-action');
             if (isSelected) {
-                actionContainer.innerHTML = `<button class="w-full bg-green-600 text-white font-bold py-4 rounded-xl cursor-default border-b-4 border-green-800 shadow-[0_0_15px_rgba(22,163,74,0.5)] text-xl">EQUIPPED</button>`;
+                actionContainer.innerHTML = `<button class="w-full bg-green-600 text-white font-bold py-2 sm:py-4 rounded-xl cursor-default border-b-4 border-green-800 shadow-[0_0_15px_rgba(22,163,74,0.5)] text-sm sm:text-xl">EQUIPPED</button>`;
             } else if (isOwned) {
-                actionContainer.innerHTML = `<button onclick="selectCar('${item.id}')" class="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-4 rounded-xl transition transform hover:scale-105 border-b-4 border-blue-800 cursor-pointer shadow-lg text-xl">EQUIP ZAMBONI</button>`;
+                actionContainer.innerHTML = `<button onclick="selectCar('${item.id}')" class="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-2 sm:py-4 rounded-xl transition transform hover:scale-105 border-b-4 border-blue-800 cursor-pointer shadow-lg text-sm sm:text-xl">EQUIP ZAMBONI</button>`;
             } else if (canAfford) {
-                actionContainer.innerHTML = `<button onclick="buyCar('${item.id}')" class="w-full bg-yellow-500 hover:bg-yellow-400 text-black font-black py-4 rounded-xl transition transform hover:scale-105 border-b-4 border-yellow-700 cursor-pointer shadow-[0_0_15px_rgba(234,179,8,0.5)] text-xl">BUY (${item.cost} PUCKS)</button>`;
+                actionContainer.innerHTML = `<button onclick="buyCar('${item.id}')" class="w-full bg-yellow-500 hover:bg-yellow-400 text-black font-black py-2 sm:py-4 rounded-xl transition transform hover:scale-105 border-b-4 border-yellow-700 cursor-pointer shadow-[0_0_15px_rgba(234,179,8,0.5)] text-sm sm:text-xl">BUY (${item.cost} PUCKS)</button>`;
             } else {
-                actionContainer.innerHTML = `<button class="w-full bg-gray-700 text-gray-500 font-bold py-4 rounded-xl cursor-not-allowed border-b-4 border-gray-900 text-xl">LOCKED (${item.cost} PUCKS)</button>`;
+                actionContainer.innerHTML = `<button class="w-full bg-gray-700 text-gray-500 font-bold py-2 sm:py-4 rounded-xl cursor-not-allowed border-b-4 border-gray-900 text-sm sm:text-xl">LOCKED (${item.cost} PUCKS)</button>`;
             }
         }
 
@@ -317,6 +344,7 @@
             
             updateShopUI();
             setupShopCar();
+            resizeShopCanvas(); 
         }
 
         function closeShop() {
@@ -335,6 +363,7 @@
                 PLAYER_DATA.owned.push(id);
                 PLAYER_DATA.selected = id;
                 updateShopUI();
+                setupMenuCars(); 
             }
         }
 
@@ -342,6 +371,7 @@
             if (PLAYER_DATA.owned.includes(id)) {
                 PLAYER_DATA.selected = id;
                 updateShopUI();
+                setupMenuCars(); 
             }
         }
 
@@ -357,6 +387,7 @@
         let physicalW = window.innerWidth;
         let physicalH = window.innerHeight;
         let camera, renderer;
+        let shopCamera, shopRenderer; 
 
         function handleResize() {
             physicalW = window.innerWidth;
@@ -381,21 +412,37 @@
                 camera.aspect = GAME.width / GAME.height;
                 camera.updateProjectionMatrix();
                 renderer.setSize(GAME.width, GAME.height);
-                
-                if(GAME.state === 'SHOP') setupShopCar();
+            }
+
+            if (GAME.state === 'SHOP') {
+                resizeShopCanvas();
             }
         }
+        
+        function resizeShopCanvas() {
+            const container = document.getElementById('shop-3d-container');
+            if (container && shopCamera && shopRenderer) {
+                const w = container.clientWidth;
+                const h = container.clientHeight;
+                if (w > 0 && h > 0) {
+                    shopCamera.aspect = w / h;
+                    shopCamera.updateProjectionMatrix();
+                    shopRenderer.setSize(w, h);
+                }
+            }
+        }
+
         window.addEventListener('resize', handleResize);
         handleResize();
 
-        // --- 2. THREE.JS SETUP ---
+        // --- 2. THREE.JS SETUP (MAIN GAME) ---
         const container = document.getElementById('game-container');
         const scene = new THREE.Scene();
         scene.fog = new THREE.FogExp2(0x050510, 0.012);
 
         camera = new THREE.PerspectiveCamera(35, GAME.width / GAME.height, 0.1, 1000);
-        camera.position.set(0, 14, 55); 
-        camera.lookAt(0, 10, 0);
+        camera.position.set(0, 16, 60); 
+        camera.lookAt(0, 12, 0);
 
         renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
         renderer.setSize(GAME.width, GAME.height);
@@ -406,10 +453,30 @@
 
         const ambientLight = new THREE.AmbientLight(0xd0e0ff, 1.2); 
         scene.add(ambientLight);
-        
         const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
         dirLight.position.set(0, 30, 10);
         scene.add(dirLight);
+
+        // --- 2.5 THREE.JS SETUP (SHOP SECONDARY CANVAS) ---
+        const shopDOMContainer = document.getElementById('shop-3d-container');
+        const shopScene = new THREE.Scene();
+        shopCamera = new THREE.PerspectiveCamera(40, 1, 0.1, 1000);
+        shopCamera.position.set(0, 4, 18); 
+        shopCamera.lookAt(0, 1.5, 0);
+
+        shopRenderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+        shopRenderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        shopRenderer.toneMapping = THREE.ACESFilmicToneMapping;
+        shopRenderer.toneMappingExposure = 1.0; 
+        shopDOMContainer.appendChild(shopRenderer.domElement);
+
+        const shopAmbientLight = new THREE.AmbientLight(0xd0e0ff, 1.2); 
+        shopScene.add(shopAmbientLight);
+        const shopDirLight = new THREE.DirectionalLight(0xffffff, 1.0);
+        shopDirLight.position.set(5, 10, 10);
+        shopScene.add(shopDirLight);
+
+        let shopZamboni = null;
 
         // --- 3. ICE RINK ENVIRONMENT BUILDER ---
         const arenaGroup = new THREE.Group();
@@ -507,7 +574,7 @@
             for(let i=0; i<count; i++) {
                 const mesh = new THREE.Mesh(particleGeo, mat);
                 mesh.position.set(x + (Math.random()-0.5), y + (Math.random()-0.5), 0);
-                scene.add(mesh);
+                scene.add(mesh); // Main scene only
                 particles.push({
                     mesh: mesh, vx: (Math.random() - 0.5) * speed, vy: (Math.random() - 0.5) * speed,
                     vz: (Math.random() - 0.5) * speed * 0.5, life: life, maxLife: life
@@ -527,9 +594,10 @@
 
         // --- 5. ENTITY CLASSES ---
         class Zamboni {
-            constructor(isP1, colorHexStr) {
+            constructor(isP1, colorHexStr, targetScene = scene) {
                 this.isP1 = isP1;
                 this.color = colorHexStr; 
+                this.targetScene = targetScene; 
                 
                 this.facingLeft = !isP1; 
                 this.visualRotY = isP1 ? 0 : Math.PI; 
@@ -600,7 +668,7 @@
                 const lightBack = new THREE.PointLight(this.color, 1.2, 15);
                 lightBack.position.set(0, 1, -2.5); this.pitchGroup.add(lightBack);
 
-                scene.add(this.yawGroup);
+                this.targetScene.add(this.yawGroup);
             }
 
             reset() {
@@ -627,7 +695,13 @@
             }
 
             update(inputLeft, inputRight, inputJump, inputBoost, joyX, joyY, joyActive) {
-                if (GAME.state !== 'PLAYING') return;
+                // If game is in countdown or freeze, don't process inputs, just let physics run
+                if (GAME.state !== 'PLAYING' && GAME.state !== 'ROUND_OVER') return;
+                
+                if (GAME.state === 'ROUND_OVER') {
+                    inputLeft = false; inputRight = false; inputJump = false; inputBoost = false;
+                    joyActive = false; joyX = 0; joyY = 0;
+                }
 
                 if (joyActive) {
                     if (joyX < -10) this.facingLeft = true;
@@ -808,16 +882,22 @@
 
                 if (Math.abs(angleDiff) < 0.5 && dist > 5 && ai.boostFuel > 20) boost = true;
             }
+            
+            // Block input for AI too if round is over
+            if (GAME.state === 'ROUND_OVER') {
+                left = right = jump = boost = joyActive = false;
+            }
+            
             ai.update(left, right, jump, boost, joyX, joyY, joyActive);
         }
 
-        // --- 6. GAME LOGIC ---
+        // --- 6. GAME LOGIC & COUNTDOWN ---
 
         function setupMenuCars() {
             if(p1) { scene.remove(p1.yawGroup); scene.remove(p2.yawGroup); p1=null; p2=null; }
             const p1Color = getSelectedCarColor();
-            p1 = new Zamboni(true, p1Color); 
-            p2 = new Zamboni(false, '#3b82f6'); 
+            p1 = new Zamboni(true, p1Color, scene); 
+            p2 = new Zamboni(false, '#3b82f6', scene); 
             
             p1.pos.set(-6, 1.25);
             p2.pos.set(6, 1.25);
@@ -826,15 +906,12 @@
         }
 
         function setupShopCar() {
-            if(p1) { scene.remove(p1.yawGroup); p1=null; }
-            if(p2) { scene.remove(p2.yawGroup); p2=null; } 
-            
+            if(shopZamboni) { shopScene.remove(shopZamboni.yawGroup); shopZamboni = null; }
             const item = SHOP_ITEMS[currentShopIndex];
-            p1 = new Zamboni(true, item.color);
             
-            const isMobileView = GAME.width < 768;
-            p1.pos.set(isMobileView ? 0 : 8, 1.25); 
-            p1.updateMesh();
+            shopZamboni = new Zamboni(true, item.color, shopScene);
+            shopZamboni.pos.set(0, 1.25); 
+            shopZamboni.updateMesh();
         }
 
         function startGame() {
@@ -843,10 +920,11 @@
             if(p1) { scene.remove(p1.yawGroup); }
             if(p2) { scene.remove(p2.yawGroup); }
             
-            p1 = new Zamboni(true, getSelectedCarColor()); 
-            p2 = new Zamboni(false, '#3b82f6');
+            p1 = new Zamboni(true, getSelectedCarColor(), scene); 
+            p2 = new Zamboni(false, '#3b82f6', scene);
 
-            GAME.state = 'PLAYING';
+            p1.reset(); p2.reset();
+            GAME.state = 'ROUND_OVER'; 
             p1.score = 0; p2.score = 0;
             
             UI.pucksDisplay.classList.add('hidden');
@@ -857,20 +935,68 @@
             updateHUD();
 
             if (isMobileDevice) { UI.mobileControls.style.display = 'block'; }
-            startRound("FIGHT!");
+            
+            triggerRoundEnd(null);
         }
 
-        function startRound(msgText) {
-            GAME.state = 'ROUND_OVER'; p1.reset(); p2.reset();
+        async function triggerRoundEnd(msgText) {
+            let activeRound = ++currentRoundId;
+            GAME.state = 'ROUND_OVER'; 
+            
+            if (msgText) {
+                UI.msgText.innerText = msgText; 
+                UI.msgText.style.color = '#fff';
+                UI.msgText.style.opacity = 1; 
+                UI.msgText.style.transform = "scale(1)";
+                
+                await sleep(1500); 
+                if (activeRound !== currentRoundId) return; 
+                
+                UI.msgText.style.opacity = 0; 
+                UI.msgText.style.transform = "scale(1.5)";
+                await sleep(300);
+            }
+            
+            if (activeRound !== currentRoundId) return;
+            
+            p1.reset(); p2.reset();
             particles.forEach(p => scene.remove(p.mesh)); particles.length = 0;
-            showMsg(msgText);
-            setTimeout(() => { hideMsg(); GAME.state = 'PLAYING'; }, 1500);
-        }
 
-        function showMsg(text) { UI.msg.innerText = text; UI.msg.style.opacity = 1; UI.msg.style.transform = "scale(1)"; }
-        function hideMsg() { UI.msg.style.opacity = 0; UI.msg.style.transform = "scale(1.5)"; }
+            const animateText = async (text, color = '#fff') => {
+                if (activeRound !== currentRoundId) return;
+                UI.msgText.innerText = text;
+                UI.msgText.style.color = color;
+                UI.msgText.style.opacity = 1;
+                UI.msgText.style.transform = "scale(1)";
+                await sleep(700);
+                
+                if (activeRound !== currentRoundId) return;
+                UI.msgText.style.opacity = 0;
+                UI.msgText.style.transform = "scale(1.5)";
+                await sleep(300);
+            };
+
+            await animateText("3", "#ef4444"); 
+            await animateText("2", "#f59e0b"); 
+            await animateText("1", "#10b981"); 
+            
+            if (activeRound !== currentRoundId) return;
+            
+            UI.msgText.innerText = "FIGHT!";
+            UI.msgText.style.color = "#fff";
+            UI.msgText.style.opacity = 1;
+            UI.msgText.style.transform = "scale(1)";
+            
+            GAME.state = 'PLAYING';
+            
+            await sleep(1000);
+            if (activeRound !== currentRoundId) return;
+            UI.msgText.style.opacity = 0;
+            UI.msgText.style.transform = "scale(1.5)";
+        }
 
         function endGame(winnerName, colorHexStr) {
+            currentRoundId++; 
             GAME.state = 'GAME_OVER';
             UI.winnerText.innerText = `${winnerName} WINS!`; 
             UI.winnerText.style.color = colorHexStr;
@@ -888,6 +1014,7 @@
         }
 
         function returnToMenu() {
+            currentRoundId++; 
             GAME.state = 'MENU';
             UI.gameOver.classList.add('hidden'); 
             UI.hud.classList.add('hidden'); 
@@ -931,13 +1058,13 @@
 
             if (hit1 && hit2) {
                 spawnParticles(c1.x, c1.y, p1.color, 30, 1.0); spawnParticles(c2.x, c2.y, p2.color, 30, 1.0);
-                startRound("DRAW!");
+                triggerRoundEnd("DRAW!");
             } else if (hit1) {
                 spawnParticles(c2.x, c2.y, p2.color, 40, 1.2); p1.score++;
-                if (p1.score >= GAME.maxScore) endGame("PLAYER 1", p1.color); else startRound("P1 SCORES!");
+                if (p1.score >= GAME.maxScore) endGame("PLAYER 1", p1.color); else triggerRoundEnd("P1 SCORES!");
             } else if (hit2) {
                 spawnParticles(c1.x, c1.y, p1.color, 40, 1.2); p2.score++;
-                if (p2.score >= GAME.maxScore) endGame("AI", "#3b82f6"); else startRound("P2 SCORES!");
+                if (p2.score >= GAME.maxScore) endGame("AI", "#3b82f6"); else triggerRoundEnd("P2 SCORES!");
             }
 
             if (!hit1 && !hit2 && c1.distanceTo(c2) < 3.5) {
@@ -1056,9 +1183,14 @@
                 camera.lookAt(0, 4, 0);
             }
             else if (GAME.state === 'SHOP') {
-                if (p1) {
+                if (p1 && p2) {
                     p1.visualRotY += 0.02;
-                    p1.updateMesh();
+                    p2.visualRotY -= 0.02;
+                    p1.updateMesh(); p2.updateMesh();
+                }
+                if (shopZamboni) {
+                    shopZamboni.visualRotY += 0.02;
+                    shopZamboni.updateMesh();
                 }
                 camera.position.x += (0 - camera.position.x) * 0.1;
                 camera.position.y += (10 - camera.position.y) * 0.1;
@@ -1067,19 +1199,26 @@
             else if (GAME.state === 'PLAYING' || GAME.state === 'ROUND_OVER') {
                 p1.update(INPUT.left, INPUT.right, INPUT.jump, INPUT.boost, INPUT.joyX, INPUT.joyY, INPUT.joyActive);
                 runAI(p2, p1);
-                checkCollisions(); 
+                
+                if (GAME.state === 'PLAYING') {
+                    checkCollisions(); 
+                }
                 
                 if(p1 && p2) {
                     const midX = (p1.pos.x + p2.pos.x) / 2; 
                     const midY = (p1.pos.y + p2.pos.y) / 2;
                     camera.position.x += (midX * 0.3 - camera.position.x) * 0.05;
-                    camera.position.y += (Math.max(14, midY + 8) - camera.position.y) * 0.05;
+                    camera.position.y += (Math.max(14, midY + 8) - camera.position.y) * 0.1;
                     camera.lookAt(camera.position.x, Math.max(10, midY + 2), 0);
                 }
             }
             
             updateParticles();
             renderer.render(scene, camera);
+            
+            if (GAME.state === 'SHOP' && shopRenderer) {
+                shopRenderer.render(shopScene, shopCamera);
+            }
 
             if (GAME.state === 'PLAYING' || GAME.state === 'ROUND_OVER') {
                 updateHUD();
@@ -1092,5 +1231,4 @@
     </script>
 </body>
 </html>
-
 
