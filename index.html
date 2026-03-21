@@ -1,1 +1,1096 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Zamboni Jousting: Sideswipe</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <style>
+        body, html {
+            margin: 0; padding: 0; width: 100%; 
+            height: 100%; height: 100dvh; /* Dynamic viewport height fixes URL bar clipping */
+            overflow: hidden; background-color: #050510;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            touch-action: none; 
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        #main-wrapper {
+            position: absolute; top: 0; left: 0; width: 100%; 
+            height: 100%; height: 100dvh; 
+            overflow: hidden;
+            padding-bottom: env(safe-area-inset-bottom);
+            padding-top: env(safe-area-inset-top);
+        }
+
+        #game-container {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+        }
+        
+        #ui-layer {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            pointer-events: none; display: flex; flex-direction: column; z-index: 100; 
+        }
+        .interactive { pointer-events: auto; }
+        
+        #mobile-controls {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            pointer-events: none; display: none; z-index: 50;
+        }
+        .touch-zone { position: absolute; pointer-events: auto; }
+        
+        #joystick-area { left: 0; top: 0; width: 50%; height: 100%; }
+        
+        #action-area { 
+            right: 0; top: 0; width: 50%; height: 100%; 
+            display: flex; justify-content: flex-end; align-items: flex-end; 
+            padding: max(40px, env(safe-area-inset-bottom)) max(30px, env(safe-area-inset-right)); 
+            gap: 20px;
+        }
+        
+        .control-btn {
+            width: 80px; height: 80px; border-radius: 50%;
+            background: rgba(255,255,255,0.1); border: 2px solid rgba(255,255,255,0.3);
+            display: flex; justify-content: center; align-items: center;
+            color: white; font-weight: bold; font-size: 14px;
+            backdrop-filter: blur(4px); transition: background 0.1s;
+        }
+        .control-btn.active { background: rgba(255,255,255,0.4); transform: scale(0.95); }
+        
+        #joystick-base {
+            position: absolute; width: 120px; height: 120px; border-radius: 50%;
+            background: rgba(255,255,255,0.05); border: 2px solid rgba(255,255,255,0.1);
+            transform: translate(-50%, -50%); display: none; pointer-events: none;
+        }
+        #joystick-stick {
+            position: absolute; width: 50px; height: 50px; border-radius: 50%;
+            background: rgba(255,255,255,0.4); transform: translate(-50%, -50%);
+            box-shadow: 0 0 10px rgba(255,255,255,0.5); pointer-events: none;
+        }
+
+        .boost-meter-container {
+            width: 150px; height: 10px; background: rgba(0,0,0,0.5);
+            border-radius: 5px; overflow: hidden; border: 1px solid rgba(255,255,255,0.2);
+        }
+        .boost-fill { height: 100%; width: 100%; transition: width 0.1s linear, background-color 0.3s; }
+
+        .neon-text { text-shadow: 0 0 10px currentColor, 0 0 20px currentColor; }
+        .glass-panel { background: rgba(15, 20, 35, 0.75); backdrop-filter: blur(8px); border: 1px solid rgba(255,255,255,0.1); }
+        
+        @media (max-width: 768px) {
+            .desktop-hint { display: none; }
+        }
+    </style>
+</head>
+<body>
+
+    <div id="main-wrapper">
+        <div id="game-container"></div>
+
+        <div id="ui-layer">
+            
+            <!-- Global Pucks Display -->
+            <div id="pucks-display" class="interactive absolute top-4 right-4 flex items-center gap-2 glass-panel px-4 py-2 rounded-full border border-yellow-500 shadow-[0_0_15px_rgba(234,179,8,0.4)] z-50 transition-opacity duration-300" style="top: max(16px, env(safe-area-inset-top)); right: max(16px, env(safe-area-inset-right));">
+                <div class="w-6 h-6 bg-black rounded-full border-2 border-gray-600 shadow-inner flex justify-center items-center">
+                    <div class="w-4 h-4 bg-gray-800 rounded-full border border-gray-700"></div>
+                </div>
+                <span class="text-yellow-400 font-bold text-lg tracking-wider">PUCKS:</span>
+                <span id="pucks-count" class="text-white font-black text-xl">0</span>
+            </div>
+
+            <!-- In-Game HUD -->
+            <div id="hud" class="w-full p-4 flex justify-between items-start hidden transition-opacity duration-500 z-10" style="padding-top: max(16px, env(safe-area-inset-top)); padding-left: max(16px, env(safe-area-inset-left)); padding-right: max(16px, env(safe-area-inset-right));">
+                <div class="flex flex-col gap-2">
+                    <div id="p1-panel" class="flex items-center gap-4 glass-panel p-3 rounded-xl border-l-4 transition-all duration-300" style="border-color: #ef4444; box-shadow: 0 0 15px rgba(239,68,68,0.5);">
+                        <span id="p1-label" class="font-bold text-xl uppercase tracking-wider neon-text" style="color: #ef4444;">P1</span>
+                        <span id="score1" class="text-white font-black text-4xl">0</span>
+                    </div>
+                    <div class="boost-meter-container"><div id="boost1" class="boost-fill bg-red-500"></div></div>
+                </div>
+                
+                <div id="round-message" class="text-white font-black text-4xl md:text-6xl uppercase tracking-widest text-center transform scale-150 opacity-0 transition-all duration-300 neon-text" style="color: #fff;">
+                    FIGHT!
+                </div>
+
+                <div class="flex flex-col gap-2 items-end">
+                    <div class="flex items-center gap-4 glass-panel p-3 rounded-xl border-r-4 border-blue-500 shadow-[0_0_15px_rgba(59,130,246,0.5)]">
+                        <span id="score2" class="text-white font-black text-4xl">0</span>
+                        <span class="text-blue-400 font-bold text-xl uppercase tracking-wider neon-text">P2 (AI)</span>
+                    </div>
+                    <div class="boost-meter-container"><div id="boost2" class="boost-fill bg-blue-500"></div></div>
+                </div>
+            </div>
+
+            <!-- Main Menu (Compact) -->
+            <div id="main-menu" class="interactive absolute inset-0 flex flex-col justify-end pb-24 items-center z-20 transition-opacity duration-300 pointer-events-none">
+                <div class="glass-panel p-6 rounded-3xl border border-gray-700 shadow-2xl flex flex-col items-center text-center max-w-sm w-[90%] pointer-events-auto">
+                    <h1 class="text-4xl md:text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-red-500 via-purple-500 to-blue-500 mb-1 uppercase tracking-tighter" style="filter: drop-shadow(0 0 8px rgba(168,85,247,0.5));">
+                        Zamboni
+                    </h1>
+                    <h2 class="text-xl md:text-2xl font-bold text-white mb-6 tracking-widest uppercase neon-text" style="color: #e2e8f0;">Sideswipe</h2>
+                    
+                    <button onclick="startGame()" class="w-full bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-bold py-3 px-6 rounded-xl text-lg transition transform hover:scale-105 shadow-[0_0_20px_rgba(99,102,241,0.6)] border-b-4 border-indigo-900 mb-3 cursor-pointer">
+                        PLAY VS AI
+                    </button>
+
+                    <button onclick="openShop()" class="w-full bg-gradient-to-r from-yellow-600 to-orange-600 hover:from-yellow-500 hover:to-orange-500 text-white font-bold py-3 px-6 rounded-xl text-lg transition transform hover:scale-105 shadow-[0_0_20px_rgba(245,158,11,0.5)] border-b-4 border-yellow-900 mb-4 cursor-pointer">
+                        ZAMBONI SHOP
+                    </button>
+
+                    <div class="text-xs text-gray-500 desktop-hint">
+                        <strong class="text-gray-300">Desktop:</strong> A/D to Aim | W to Jump | SHIFT to Boost
+                    </div>
+                    <div class="text-xs text-gray-400 md:hidden">
+                        First to 5 wins.
+                    </div>
+                </div>
+            </div>
+
+            <!-- Zamboni Shop -->
+            <div id="shop-menu" class="interactive absolute inset-0 flex-col md:flex-row bg-black bg-opacity-70 backdrop-blur-md z-40 hidden transition-opacity duration-300">
+                
+                <button onclick="closeShop()" class="absolute z-50 pointer-events-auto bg-gray-800 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-xl transition border-b-4 border-gray-900 cursor-pointer shadow-lg flex items-center gap-2" style="top: max(24px, env(safe-area-inset-top)); left: max(24px, env(safe-area-inset-left));">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clip-rule="evenodd" />
+                    </svg>
+                    BACK
+                </button>
+
+                <!-- Left Side: Info -->
+                <div class="w-full md:w-1/2 h-1/2 md:h-full flex items-center justify-center p-6 pt-24 md:pt-6 pointer-events-none">
+                    <div class="glass-panel p-8 rounded-3xl flex flex-col w-full max-w-sm pointer-events-auto border border-gray-700 shadow-2xl">
+                        <h1 class="text-2xl font-bold text-gray-400 mb-1">ZAMBONI SHOP</h1>
+                        <h2 id="shop-item-name" class="text-5xl font-black mb-4 drop-shadow-md uppercase">NAME</h2>
+                        <div class="bg-gray-900 bg-opacity-60 p-5 rounded-xl border border-gray-800 mb-8 min-h-[100px] flex items-center shadow-inner">
+                            <p id="shop-item-desc" class="text-gray-300 italic text-lg leading-relaxed text-center w-full">Desc</p>
+                        </div>
+                        <div id="shop-item-action"></div>
+                    </div>
+                </div>
+
+                <!-- Right Side: 3D Car Placeholder & Arrows -->
+                <div class="w-full md:w-1/2 h-1/2 md:h-full flex items-center justify-between px-4 md:px-12 pointer-events-none">
+                    <button onclick="prevShopItem()" class="pointer-events-auto bg-black bg-opacity-60 hover:bg-opacity-90 text-white rounded-full w-14 h-14 flex items-center justify-center border-2 border-gray-500 transition transform hover:scale-110 shadow-[0_0_15px_rgba(0,0,0,0.8)] cursor-pointer">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="w-8 h-8" viewBox="0 0 20 20" fill="currentColor">
+                            <path fill-rule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clip-rule="evenodd" />
+                        </svg>
+                    </button>
+                    <div class="flex-1"></div>
+                    <button onclick="nextShopItem()" class="pointer-events-auto bg-black bg-opacity-60 hover:bg-opacity-90 text-white rounded-full w-14 h-14 flex items-center justify-center border-2 border-gray-500 transition transform hover:scale-110 shadow-[0_0_15px_rgba(0,0,0,0.8)] cursor-pointer">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="w-8 h-8" viewBox="0 0 20 20" fill="currentColor">
+                            <path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd" />
+                        </svg>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Game Over Screen -->
+            <div id="game-over" class="interactive flex-1 flex flex-col justify-center items-center bg-black bg-opacity-80 backdrop-blur-md z-30 hidden absolute inset-0 transition-opacity duration-300">
+                <div class="glass-panel p-10 rounded-3xl flex flex-col items-center text-center shadow-2xl">
+                    <h1 id="winner-text" class="text-5xl md:text-7xl font-black text-white mb-4 tracking-wider uppercase drop-shadow-[0_0_20px_currentColor]">RED WINS!</h1>
+                    <p id="reward-text" class="text-yellow-400 font-bold text-2xl mb-8 hidden">+5 PUCKS EARNED!</p>
+                    
+                    <button onclick="returnToMenu()" class="bg-gray-700 hover:bg-gray-600 text-white font-bold py-3 px-10 rounded-xl text-xl transition transform hover:scale-105 shadow-lg border-b-4 border-gray-800 cursor-pointer">
+                        Main Menu
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div id="mobile-controls">
+            <div id="joystick-area" class="touch-zone">
+                <div id="joystick-base"><div id="joystick-stick"></div></div>
+            </div>
+            <div id="action-area" class="touch-zone">
+                <div id="btn-boost" class="control-btn" style="box-shadow: 0 0 15px rgba(239,68,68,0.5); border-color: #ef4444;">BOOST</div>
+                <div id="btn-jump" class="control-btn" style="box-shadow: 0 0 15px rgba(59,130,246,0.5); border-color: #3b82f6;">JUMP</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- 1. GAME CONSTANTS & STATE ---
+        const GAME = {
+            state: 'MENU',
+            width: window.innerWidth,
+            height: window.innerHeight,
+            maxScore: 5,
+            arena: { width: 40, height: 25 },
+            gravity: 0.012,
+            dt: 1
+        };
+
+        const INPUT = { 
+            left: false, right: false, jump: false, boost: false,
+            joyX: 0, joyY: 0, joyActive: false 
+        };
+
+        const UI = {
+            wrapper: document.getElementById('main-wrapper'),
+            menu: document.getElementById('main-menu'),
+            shop: document.getElementById('shop-menu'),
+            hud: document.getElementById('hud'),
+            gameOver: document.getElementById('game-over'),
+            pucksDisplay: document.getElementById('pucks-display'),
+            pucksCount: document.getElementById('pucks-count'),
+            score1: document.getElementById('score1'),
+            score2: document.getElementById('score2'),
+            p1Panel: document.getElementById('p1-panel'),
+            p1Label: document.getElementById('p1-label'),
+            boost1: document.getElementById('boost1'),
+            boost2: document.getElementById('boost2'),
+            msg: document.getElementById('round-message'),
+            winnerText: document.getElementById('winner-text'),
+            rewardText: document.getElementById('reward-text'),
+            mobileControls: document.getElementById('mobile-controls')
+        };
+
+        const isMobileDevice = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0) || (window.innerWidth <= 768);
+
+        // --- 1.5 PLAYER DATA & SHOP SYSTEM ---
+        const PLAYER_DATA = {
+            pucks: 0,
+            owned: ['Broker'],
+            selected: 'Broker'
+        };
+
+        const SHOP_ITEMS = [
+            { id: 'Broker', name: 'Broker', cost: 0, color: '#ef4444', desc: 'Looks like you got the leftovers.' },
+            { id: 'Biff', name: 'Biff', cost: 15, color: '#f59e0b', desc: 'He likes to biff people. Keep him away from the hockey pucks though.' },
+            { id: 'Charlie', name: 'Charlie', cost: 50, color: '#10b981', desc: 'Looks like the rich kid cooking up a victory.' }
+        ];
+
+        let currentShopIndex = 0;
+
+        function getSelectedCarColor() {
+            const item = SHOP_ITEMS.find(i => i.id === PLAYER_DATA.selected);
+            return item ? item.color : '#ef4444';
+        }
+
+        function updateShopUI() {
+            UI.pucksCount.innerText = PLAYER_DATA.pucks;
+            
+            const item = SHOP_ITEMS[currentShopIndex];
+            
+            document.getElementById('shop-item-name').innerText = item.name;
+            document.getElementById('shop-item-name').style.color = item.color;
+            document.getElementById('shop-item-desc').innerText = item.desc;
+            
+            const isOwned = PLAYER_DATA.owned.includes(item.id);
+            const isSelected = PLAYER_DATA.selected === item.id;
+            const canAfford = PLAYER_DATA.pucks >= item.cost;
+            
+            const actionContainer = document.getElementById('shop-item-action');
+            if (isSelected) {
+                actionContainer.innerHTML = `<button class="w-full bg-green-600 text-white font-bold py-4 rounded-xl cursor-default border-b-4 border-green-800 shadow-[0_0_15px_rgba(22,163,74,0.5)] text-xl">EQUIPPED</button>`;
+            } else if (isOwned) {
+                actionContainer.innerHTML = `<button onclick="selectCar('${item.id}')" class="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-4 rounded-xl transition transform hover:scale-105 border-b-4 border-blue-800 cursor-pointer shadow-lg text-xl">EQUIP ZAMBONI</button>`;
+            } else if (canAfford) {
+                actionContainer.innerHTML = `<button onclick="buyCar('${item.id}')" class="w-full bg-yellow-500 hover:bg-yellow-400 text-black font-black py-4 rounded-xl transition transform hover:scale-105 border-b-4 border-yellow-700 cursor-pointer shadow-[0_0_15px_rgba(234,179,8,0.5)] text-xl">BUY (${item.cost} PUCKS)</button>`;
+            } else {
+                actionContainer.innerHTML = `<button class="w-full bg-gray-700 text-gray-500 font-bold py-4 rounded-xl cursor-not-allowed border-b-4 border-gray-900 text-xl">LOCKED (${item.cost} PUCKS)</button>`;
+            }
+        }
+
+        function prevShopItem() {
+            currentShopIndex = (currentShopIndex - 1 + SHOP_ITEMS.length) % SHOP_ITEMS.length;
+            updateShopUI();
+            setupShopCar();
+        }
+
+        function nextShopItem() {
+            currentShopIndex = (currentShopIndex + 1) % SHOP_ITEMS.length;
+            updateShopUI();
+            setupShopCar();
+        }
+
+        function openShop() {
+            GAME.state = 'SHOP';
+            currentShopIndex = SHOP_ITEMS.findIndex(i => i.id === PLAYER_DATA.selected);
+            if(currentShopIndex === -1) currentShopIndex = 0;
+            
+            UI.menu.classList.add('hidden');
+            UI.shop.classList.remove('hidden');
+            UI.shop.classList.add('flex');
+            
+            updateShopUI();
+            setupShopCar();
+        }
+
+        function closeShop() {
+            GAME.state = 'MENU';
+            UI.shop.classList.add('hidden');
+            UI.shop.classList.remove('flex');
+            UI.menu.classList.remove('hidden');
+            
+            setupMenuCars();
+        }
+
+        function buyCar(id) {
+            const item = SHOP_ITEMS.find(i => i.id === id);
+            if (PLAYER_DATA.pucks >= item.cost && !PLAYER_DATA.owned.includes(id)) {
+                PLAYER_DATA.pucks -= item.cost;
+                PLAYER_DATA.owned.push(id);
+                PLAYER_DATA.selected = id;
+                updateShopUI();
+            }
+        }
+
+        function selectCar(id) {
+            if (PLAYER_DATA.owned.includes(id)) {
+                PLAYER_DATA.selected = id;
+                updateShopUI();
+            }
+        }
+
+        // --- FULLSCREEN & ORIENTATION LOGIC ---
+        function requestFullscreenAndLock() {
+            const elem = document.documentElement;
+            if (elem.requestFullscreen) elem.requestFullscreen().catch(() => {});
+            else if (elem.webkitRequestFullscreen) elem.webkitRequestFullscreen().catch(() => {});
+            if (screen.orientation && screen.orientation.lock) screen.orientation.lock('landscape').catch(() => {});
+        }
+
+        let isRotated = false;
+        let physicalW = window.innerWidth;
+        let physicalH = window.innerHeight;
+        let camera, renderer;
+
+        function handleResize() {
+            physicalW = window.innerWidth;
+            physicalH = window.innerHeight;
+            
+            if (physicalH > physicalW) {
+                isRotated = true;
+                UI.wrapper.style.width = physicalH + 'px';
+                UI.wrapper.style.height = physicalW + 'px';
+                UI.wrapper.style.transform = 'rotate(90deg)';
+                UI.wrapper.style.transformOrigin = 'top left';
+                UI.wrapper.style.left = physicalW + 'px';
+                GAME.width = physicalH; GAME.height = physicalW;
+            } else {
+                isRotated = false;
+                UI.wrapper.style.width = '100%'; UI.wrapper.style.height = '100%';
+                UI.wrapper.style.transform = 'none'; UI.wrapper.style.left = '0px';
+                GAME.width = physicalW; GAME.height = physicalH;
+            }
+
+            if (camera && renderer) {
+                camera.aspect = GAME.width / GAME.height;
+                camera.updateProjectionMatrix();
+                renderer.setSize(GAME.width, GAME.height);
+                
+                if(GAME.state === 'SHOP') setupShopCar();
+            }
+        }
+        window.addEventListener('resize', handleResize);
+        handleResize();
+
+        // --- 2. THREE.JS SETUP ---
+        const container = document.getElementById('game-container');
+        const scene = new THREE.Scene();
+        scene.fog = new THREE.FogExp2(0x050510, 0.012);
+
+        camera = new THREE.PerspectiveCamera(35, GAME.width / GAME.height, 0.1, 1000);
+        camera.position.set(0, 14, 55); 
+        camera.lookAt(0, 10, 0);
+
+        renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+        renderer.setSize(GAME.width, GAME.height);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        renderer.toneMapping = THREE.ACESFilmicToneMapping;
+        renderer.toneMappingExposure = 1.0; 
+        container.appendChild(renderer.domElement);
+
+        const ambientLight = new THREE.AmbientLight(0xd0e0ff, 1.2); 
+        scene.add(ambientLight);
+        
+        const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+        dirLight.position.set(0, 30, 10);
+        scene.add(dirLight);
+
+        // --- 3. ICE RINK ENVIRONMENT BUILDER ---
+        const arenaGroup = new THREE.Group();
+        scene.add(arenaGroup);
+
+        function createIceTexture() {
+            const canvas = document.createElement('canvas');
+            canvas.width = 2048; canvas.height = 512;  
+            const ctx = canvas.getContext('2d');
+
+            ctx.fillStyle = '#dae8f5'; 
+            ctx.fillRect(0, 0, 2048, 512);
+
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
+            for(let i=0; i<1500; i++) {
+                ctx.beginPath();
+                let x = Math.random() * 2048; let y = Math.random() * 512;
+                ctx.moveTo(x, y); ctx.lineTo(x + (Math.random()-0.5)*30, y + (Math.random()-0.5)*30);
+                ctx.stroke();
+            }
+
+            const cX = 1024; const cY = 256;
+
+            ctx.lineWidth = 12; ctx.strokeStyle = '#d02020';
+            ctx.beginPath(); ctx.moveTo(cX, 0); ctx.lineTo(cX, 512); ctx.stroke();
+
+            ctx.beginPath(); ctx.arc(cX, cY, 150, 0, Math.PI*2); ctx.stroke();
+            ctx.fillStyle = '#d02020';
+            ctx.beginPath(); ctx.arc(cX, cY, 15, 0, Math.PI*2); ctx.fill();
+
+            ctx.strokeStyle = '#2040d0';
+            ctx.beginPath(); ctx.moveTo(cX - 300, 0); ctx.lineTo(cX - 300, 512); ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(cX + 300, 0); ctx.lineTo(cX + 300, 512); ctx.stroke();
+
+            ctx.fillStyle = 'rgba(32, 64, 208, 0.3)'; ctx.strokeStyle = '#d02020'; ctx.lineWidth = 6;
+            ctx.beginPath(); ctx.arc(0, cY, 120, -Math.PI/2, Math.PI/2); ctx.fill(); ctx.stroke();
+            ctx.beginPath(); ctx.arc(2048, cY, 120, Math.PI/2, -Math.PI/2); ctx.fill(); ctx.stroke();
+
+            const drawCircle = (x, y) => {
+                ctx.beginPath(); ctx.arc(x, y, 100, 0, Math.PI*2); ctx.stroke();
+                ctx.fillStyle = '#d02020';
+                ctx.beginPath(); ctx.arc(x, y, 10, 0, Math.PI*2); ctx.fill();
+            };
+            drawCircle(cX - 650, cY - 130); drawCircle(cX - 650, cY + 130);
+            drawCircle(cX + 650, cY - 130); drawCircle(cX + 650, cY + 130);
+
+            const texture = new THREE.CanvasTexture(canvas);
+            texture.anisotropy = renderer.capabilities.getMaxAnisotropy();
+            return texture;
+        }
+
+        const iceTexture = createIceTexture();
+        const floorGeo = new THREE.BoxGeometry(GAME.arena.width * 2, 2, 20);
+        const floorMat = new THREE.MeshStandardMaterial({ 
+            map: iceTexture, color: 0xffffff, roughness: 0.15, metalness: 0.2
+        });
+        const floor = new THREE.Mesh(floorGeo, floorMat);
+        floor.position.y = -1;
+        arenaGroup.add(floor);
+
+        function createBoards(x, y, z, rotY, length) {
+            const boardGroup = new THREE.Group();
+            boardGroup.position.set(x, y, z); boardGroup.rotation.y = rotY;
+
+            const wall = new THREE.Mesh(new THREE.BoxGeometry(length, 2.5, 0.5), new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.6 }));
+            wall.position.y = 1.25; boardGroup.add(wall);
+
+            const kickplate = new THREE.Mesh(new THREE.BoxGeometry(length, 0.5, 0.6), new THREE.MeshStandardMaterial({ color: 0xeab308, roughness: 0.8 }));
+            kickplate.position.y = 0.25; boardGroup.add(kickplate);
+
+            const topRail = new THREE.Mesh(new THREE.BoxGeometry(length, 0.15, 0.6), new THREE.MeshStandardMaterial({ color: 0x1d4ed8, roughness: 0.5 }));
+            topRail.position.y = 2.5; boardGroup.add(topRail);
+
+            const glass = new THREE.Mesh(new THREE.BoxGeometry(length, 4, 0.1), new THREE.MeshPhysicalMaterial({ 
+                color: 0xe0f0ff, transparent: true, opacity: 0.3, roughness: 0.0, transmission: 0.9, thickness: 0.1
+            }));
+            glass.position.y = 4.5; boardGroup.add(glass);
+            arenaGroup.add(boardGroup);
+        }
+
+        createBoards(0, 0, -8, 0, GAME.arena.width * 2);
+        createBoards(-GAME.arena.width, 0, 0, Math.PI / 2, 20);
+        createBoards(GAME.arena.width, 0, 0, Math.PI / 2, 20);
+
+        const darkWall = new THREE.Mesh(new THREE.BoxGeometry(200, 100, 2), new THREE.MeshBasicMaterial({ color: 0x02050a }));
+        darkWall.position.set(0, 20, -15);
+        arenaGroup.add(darkWall);
+
+        // --- 4. PARTICLE SYSTEM ---
+        const particles = [];
+        const particleGeo = new THREE.BoxGeometry(0.3, 0.3, 0.3);
+        
+        function spawnParticles(x, y, colorHexStr, count, speed = 1, life = 40) {
+            const mat = new THREE.MeshBasicMaterial({ color: colorHexStr });
+            for(let i=0; i<count; i++) {
+                const mesh = new THREE.Mesh(particleGeo, mat);
+                mesh.position.set(x + (Math.random()-0.5), y + (Math.random()-0.5), 0);
+                scene.add(mesh);
+                particles.push({
+                    mesh: mesh, vx: (Math.random() - 0.5) * speed, vy: (Math.random() - 0.5) * speed,
+                    vz: (Math.random() - 0.5) * speed * 0.5, life: life, maxLife: life
+                });
+            }
+        }
+
+        function updateParticles() {
+            for (let i = particles.length - 1; i >= 0; i--) {
+                const p = particles[i];
+                p.mesh.position.x += p.vx; p.mesh.position.y += p.vy; p.mesh.position.z += p.vz;
+                p.mesh.rotation.x += p.vx; p.mesh.rotation.y += p.vy;
+                p.life--; p.mesh.scale.setScalar(p.life / p.maxLife);
+                if (p.life <= 0) { scene.remove(p.mesh); particles.splice(i, 1); }
+            }
+        }
+
+        // --- 5. ENTITY CLASSES ---
+        class Zamboni {
+            constructor(isP1, colorHexStr) {
+                this.isP1 = isP1;
+                this.color = colorHexStr; 
+                
+                this.facingLeft = !isP1; 
+                this.visualRotY = isP1 ? 0 : Math.PI; 
+                
+                this.angle = 0; 
+                this.angularVel = 0;
+
+                this.pos = new THREE.Vector2(isP1 ? -15 : 15, 1.25);
+                this.vel = new THREE.Vector2(0, 0);
+                
+                this.isGrounded = true;
+                this.boostFuel = 100;
+                this.boostOverheated = false;
+                this.boostDelay = 0;
+                this.score = 0;
+                
+                this.accel = 0.04;
+                this.airAccel = 0.01;
+                this.jumpForce = 0.45;
+                this.boostForce = 0.035;
+                
+                this.buildMesh();
+            }
+
+            buildMesh() {
+                this.yawGroup = new THREE.Group(); 
+                this.pitchGroup = new THREE.Group(); 
+                this.yawGroup.add(this.pitchGroup);
+                
+                const bodyMat = new THREE.MeshStandardMaterial({ color: this.color, roughness: 0.3, metalness: 0.5 });
+                const darkMat = new THREE.MeshStandardMaterial({ color: '#111111', roughness: 0.9 }); 
+                const glowMat = new THREE.MeshBasicMaterial({ color: this.color }); 
+                const metalMat = new THREE.MeshStandardMaterial({ color: '#cccccc', roughness: 0.2, metalness: 0.9 });
+
+                const body = new THREE.Mesh(new THREE.BoxGeometry(3.5, 1.5, 2), bodyMat);
+                body.position.y = 0; this.pitchGroup.add(body);
+
+                const tank = new THREE.Mesh(new THREE.BoxGeometry(2.5, 1.2, 1.8), bodyMat);
+                tank.position.set(-0.3, 1.35, 0); this.pitchGroup.add(tank);
+
+                const seat = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1.6), darkMat);
+                seat.position.set(-1.2, 1.25, 0); this.pitchGroup.add(seat);
+
+                const wheelGeo = new THREE.CylinderGeometry(0.5, 0.5, 0.4, 16);
+                wheelGeo.rotateX(Math.PI / 2);
+                [[-1.2, -0.75, 1.1], [1.2, -0.75, 1.1], [-1.2, -0.75, -1.1], [1.2, -0.75, -1.1]].forEach(pos => {
+                    const w = new THREE.Mesh(wheelGeo, darkMat); w.position.set(...pos); this.pitchGroup.add(w);
+                });
+
+                const cond = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.5, 2.4), darkMat);
+                cond.position.set(-2, -1.0, 0); this.pitchGroup.add(cond);
+
+                const lanceGroup = new THREE.Group();
+                lanceGroup.position.set(1.75, 0, 0);
+                
+                const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 4), metalMat);
+                pole.rotation.z = -Math.PI / 2; pole.position.x = 2; lanceGroup.add(pole);
+                
+                const tip = new THREE.Mesh(new THREE.ConeGeometry(0.3, 1, 8), glowMat);
+                tip.rotation.z = -Math.PI / 2; tip.position.x = 4.5; lanceGroup.add(tip);
+
+                this.lanceLength = 6.25; 
+                this.pitchGroup.add(lanceGroup);
+                
+                const lightFront = new THREE.PointLight(this.color, 1.2, 15);
+                lightFront.position.set(0, 1, 2.5); this.pitchGroup.add(lightFront);
+
+                const lightBack = new THREE.PointLight(this.color, 1.2, 15);
+                lightBack.position.set(0, 1, -2.5); this.pitchGroup.add(lightBack);
+
+                scene.add(this.yawGroup);
+            }
+
+            reset() {
+                this.pos.set(this.isP1 ? -15 : 15, 1.25);
+                this.vel.set(0, 0);
+                this.facingLeft = !this.isP1;
+                this.visualRotY = this.isP1 ? 0 : Math.PI;
+                this.angle = 0;
+                this.angularVel = 0;
+                this.boostFuel = 100;
+                this.boostOverheated = false;
+                this.boostDelay = 0;
+                this.updateMesh();
+            }
+
+            getLanceTip() {
+                const cosA = Math.cos(this.angle); 
+                const sinA = Math.sin(this.angle);
+                const dirX = this.facingLeft ? -1 : 1;
+                return new THREE.Vector2(
+                    this.pos.x + dirX * this.lanceLength * cosA, 
+                    this.pos.y + this.lanceLength * sinA
+                );
+            }
+
+            update(inputLeft, inputRight, inputJump, inputBoost, joyX, joyY, joyActive) {
+                if (GAME.state !== 'PLAYING') return;
+
+                if (joyActive) {
+                    if (joyX < -10) this.facingLeft = true;
+                    else if (joyX > 10) this.facingLeft = false;
+                } else {
+                    if (inputLeft) this.facingLeft = true;
+                    else if (inputRight) this.facingLeft = false;
+                }
+
+                // Smooth Y-axis turnaround
+                const targetRotY = this.facingLeft ? Math.PI : 0;
+                let diffY = targetRotY - this.visualRotY;
+                while(diffY < -Math.PI) diffY += Math.PI*2;
+                while(diffY > Math.PI) diffY -= Math.PI*2;
+                this.visualRotY += diffY * 0.25; 
+
+                let driveInput = 0;
+                if (inputLeft) driveInput -= 1;
+                if (inputRight) driveInput += 1;
+
+                if (this.isGrounded) {
+                    this.vel.x += driveInput * this.accel;
+                    this.vel.x *= 0.92; 
+                    
+                    const visualUpDot = Math.cos(this.angle);
+                    let targetFlat = visualUpDot > 0 ? 0 : Math.PI;
+                    let diffFlat = targetFlat - this.angle;
+                    while(diffFlat > Math.PI) diffFlat -= Math.PI*2;
+                    while(diffFlat < -Math.PI) diffFlat += Math.PI*2;
+                    this.angle += diffFlat * 0.25; 
+                    this.angularVel = 0;
+                    
+                    if (inputJump) {
+                        this.vel.y = this.jumpForce; this.isGrounded = false;
+                        spawnParticles(this.pos.x, 0, '#cceeff', 10, 0.2, 20); 
+                    }
+                } else {
+                    if (joyActive && Math.hypot(joyX, joyY) > 10) {
+                        let joyAngle = Math.atan2(-joyY, joyX); 
+                        let targetPitch = this.facingLeft ? (Math.PI - joyAngle) : joyAngle;
+                        
+                        let diffPitch = targetPitch - this.angle;
+                        while(diffPitch > Math.PI) diffPitch -= Math.PI*2;
+                        while(diffPitch < -Math.PI) diffPitch += Math.PI*2;
+
+                        this.angle += diffPitch * 0.25; 
+                        this.angularVel = 0; 
+                    } else if (!joyActive) {
+                        if (inputLeft) this.angularVel += 0.015;
+                        if (inputRight) this.angularVel -= 0.015;
+                        this.angle += this.angularVel;
+                        this.angularVel *= 0.95;
+                    }
+                    
+                    this.vel.x += driveInput * this.airAccel;
+                }
+
+                this.vel.y -= GAME.gravity;
+
+                // --- BOOST LOGIC (Cleaning Ice to Recharge) ---
+                const visualUpDot = Math.cos(this.angle);
+
+                if (inputBoost && this.boostFuel > 0 && !this.boostOverheated) {
+                    this.boostFuel -= 1.5; 
+                    this.boostDelay = 30;  
+                    
+                    const cosA = Math.cos(this.angle); const sinA = Math.sin(this.angle);
+                    const dirX = this.facingLeft ? -1 : 1;
+                    
+                    this.vel.x += dirX * cosA * this.boostForce; 
+                    this.vel.y += sinA * this.boostForce;
+                    
+                    if (Math.random() < 0.6) {
+                        spawnParticles(this.pos.x - dirX * cosA * 2, this.pos.y - sinA * 2, this.color, 2, 0.4, 15);
+                    }
+
+                    if (this.boostFuel <= 0) {
+                        this.boostFuel = 0;
+                        this.boostOverheated = true; 
+                    }
+                } else {
+                    if (this.isGrounded && visualUpDot > 0.5) {
+                        if (this.boostDelay > 0) {
+                            this.boostDelay--;
+                        } else if (this.boostFuel < 100) {
+                            if (Math.abs(this.vel.x) > 0.05) {
+                                this.boostFuel += 1.5;
+                                if (Math.random() < 0.2) {
+                                    const dirX = this.facingLeft ? 1 : -1;
+                                    spawnParticles(this.pos.x + dirX * 2, 0, '#ffffff', 1, 0.1, 10);
+                                }
+                            } else {
+                                this.boostFuel += 0.5;
+                            }
+                            if (this.boostFuel >= 100) {
+                                this.boostFuel = 100;
+                                this.boostOverheated = false; 
+                            }
+                        }
+                    }
+                }
+
+                this.pos.add(this.vel);
+
+                // --- SPEAR COLLISION (Snap Flat, No Bounce) ---
+                const tip = this.getLanceTip();
+                if (tip.y < 0) {
+                    let targetFlat = (Math.abs(this.angle) > Math.PI/2) ? Math.PI * Math.sign(this.angle) : 0;
+                    let diffFlat = targetFlat - this.angle;
+                    while(diffFlat > Math.PI) diffFlat -= Math.PI*2;
+                    while(diffFlat < -Math.PI) diffFlat += Math.PI*2;
+                    
+                    this.angle += diffFlat * 0.4; 
+                    this.angularVel = 0;
+
+                    if (this.vel.y > 0) this.vel.y *= 0.5; 
+                    this.vel.x *= 0.8; 
+
+                    if (Math.random() < 0.5) {
+                        spawnParticles(tip.x, 0, '#ffffff', 5, 0.5, 20);
+                    }
+                }
+
+                // --- STANDARD BODY COLLISION ---
+                let currentRadius = 1.60 - (visualUpDot * 0.35); 
+                
+                if (this.pos.y <= currentRadius + 0.001) { 
+                    this.pos.y = currentRadius; 
+                    if (this.vel.y < 0) this.vel.y = 0; 
+                    if (visualUpDot < 0) this.vel.x *= 0.85; 
+                    this.isGrounded = true; 
+                } 
+                else { this.isGrounded = false; }
+                
+                if (this.pos.y > GAME.arena.height) { this.pos.y = GAME.arena.height; this.vel.y *= -0.5; }
+                if (this.pos.x < -GAME.arena.width + 2) { this.pos.x = -GAME.arena.width + 2; this.vel.x *= -0.5; }
+                if (this.pos.x > GAME.arena.width - 2) { this.pos.x = GAME.arena.width - 2; this.vel.x *= -0.5; }
+
+                while(this.angle > Math.PI) this.angle -= Math.PI*2;
+                while(this.angle < -Math.PI) this.angle += Math.PI*2;
+                this.updateMesh();
+            }
+
+            updateMesh() {
+                this.yawGroup.position.x = this.pos.x;
+                this.yawGroup.position.y = this.pos.y;
+                this.yawGroup.rotation.y = this.visualRotY;
+                this.pitchGroup.rotation.z = this.angle;
+            }
+        }
+
+        let p1, p2;
+
+        function runAI(ai, opponent) {
+            let left = false, right = false, jump = false, boost = false;
+            let joyActive = false, joyX = 0, joyY = 0;
+
+            const dx = opponent.pos.x - ai.pos.x; 
+            const dy = opponent.pos.y - ai.pos.y;
+            const dist = Math.hypot(dx, dy);
+
+            if (ai.isGrounded) {
+                if (dx > 2) right = true; else if (dx < -2) left = true;
+                if (opponent.pos.y > 4 && dist < 15 && Math.random() < 0.05) jump = true;
+                if (dist < 10 && Math.random() < 0.02) jump = true;
+            } else {
+                joyActive = true;
+                joyX = dx;
+                joyY = -dy; 
+                if (dx < -2) left = true; else if (dx > 2) right = true;
+                
+                let targetAngle = Math.atan2(dy, dx);
+                let lanceAngle = ai.facingLeft ? (Math.PI - ai.angle) : ai.angle;
+                
+                let angleDiff = targetAngle - lanceAngle;
+                while(angleDiff > Math.PI) angleDiff -= Math.PI*2;
+                while(angleDiff < -Math.PI) angleDiff += Math.PI*2;
+
+                if (Math.abs(angleDiff) < 0.5 && dist > 5 && ai.boostFuel > 20) boost = true;
+            }
+            ai.update(left, right, jump, boost, joyX, joyY, joyActive);
+        }
+
+        // --- 6. GAME LOGIC ---
+
+        function setupMenuCars() {
+            if(p1) { scene.remove(p1.yawGroup); scene.remove(p2.yawGroup); p1=null; p2=null; }
+            const p1Color = getSelectedCarColor();
+            p1 = new Zamboni(true, p1Color); 
+            p2 = new Zamboni(false, '#3b82f6'); 
+            
+            p1.pos.set(-6, 1.25);
+            p2.pos.set(6, 1.25);
+            p1.updateMesh();
+            p2.updateMesh();
+        }
+
+        function setupShopCar() {
+            if(p1) { scene.remove(p1.yawGroup); p1=null; }
+            if(p2) { scene.remove(p2.yawGroup); p2=null; } 
+            
+            const item = SHOP_ITEMS[currentShopIndex];
+            p1 = new Zamboni(true, item.color);
+            
+            const isMobileView = GAME.width < 768;
+            p1.pos.set(isMobileView ? 0 : 8, 1.25); 
+            p1.updateMesh();
+        }
+
+        function startGame() {
+            if (isMobileDevice) { requestFullscreenAndLock(); }
+
+            if(p1) { scene.remove(p1.yawGroup); }
+            if(p2) { scene.remove(p2.yawGroup); }
+            
+            p1 = new Zamboni(true, getSelectedCarColor()); 
+            p2 = new Zamboni(false, '#3b82f6');
+
+            GAME.state = 'PLAYING';
+            p1.score = 0; p2.score = 0;
+            
+            UI.pucksDisplay.classList.add('hidden');
+            UI.menu.classList.add('hidden');
+            UI.gameOver.classList.add('hidden');
+            UI.hud.classList.remove('hidden');
+
+            updateHUD();
+
+            if (isMobileDevice) { UI.mobileControls.style.display = 'block'; }
+            startRound("FIGHT!");
+        }
+
+        function startRound(msgText) {
+            GAME.state = 'ROUND_OVER'; p1.reset(); p2.reset();
+            particles.forEach(p => scene.remove(p.mesh)); particles.length = 0;
+            showMsg(msgText);
+            setTimeout(() => { hideMsg(); GAME.state = 'PLAYING'; }, 1500);
+        }
+
+        function showMsg(text) { UI.msg.innerText = text; UI.msg.style.opacity = 1; UI.msg.style.transform = "scale(1)"; }
+        function hideMsg() { UI.msg.style.opacity = 0; UI.msg.style.transform = "scale(1.5)"; }
+
+        function endGame(winnerName, colorHexStr) {
+            GAME.state = 'GAME_OVER';
+            UI.winnerText.innerText = `${winnerName} WINS!`; 
+            UI.winnerText.style.color = colorHexStr;
+            
+            if (winnerName === "PLAYER 1") {
+                PLAYER_DATA.pucks += 5;
+                updateShopUI(); 
+                UI.rewardText.classList.remove('hidden');
+            } else {
+                UI.rewardText.classList.add('hidden');
+            }
+
+            UI.gameOver.classList.remove('hidden'); 
+            UI.mobileControls.style.display = 'none';
+        }
+
+        function returnToMenu() {
+            GAME.state = 'MENU';
+            UI.gameOver.classList.add('hidden'); 
+            UI.hud.classList.add('hidden'); 
+            UI.menu.classList.remove('hidden');
+            UI.pucksDisplay.classList.remove('hidden');
+            UI.mobileControls.style.display = 'none';
+            setupMenuCars();
+        }
+
+        function updateHUD() {
+            UI.score1.innerText = p1.score; UI.score2.innerText = p2.score;
+            
+            UI.p1Label.style.color = p1.color;
+            UI.p1Panel.style.borderColor = p1.color;
+            UI.p1Panel.style.boxShadow = `0 0 15px ${p1.color}80`; 
+            UI.boost1.style.backgroundColor = p1.boostOverheated ? '#6b7280' : p1.color;
+            
+            UI.boost1.style.width = `${p1.boostFuel}%`; 
+            UI.boost2.style.width = `${p2.boostFuel}%`;
+            UI.boost2.style.backgroundColor = p2.boostOverheated ? '#6b7280' : '#3b82f6';
+        }
+
+        function checkCollisions() {
+            if (GAME.state !== 'PLAYING') return;
+            const t1 = p1.getLanceTip(); const t2 = p2.getLanceTip();
+
+            if (t1.distanceTo(t2) < 1.5) {
+                p1.vel.x = -(p1.facingLeft ? -1 : 1) * Math.cos(p1.angle) * 0.5; 
+                p1.vel.y = -Math.sin(p1.angle) * 0.5;
+                p2.vel.x = -(p2.facingLeft ? -1 : 1) * Math.cos(p2.angle) * 0.5; 
+                p2.vel.y = -Math.sin(p2.angle) * 0.5;
+                spawnParticles((t1.x+t2.x)/2, (t1.y+t2.y)/2, '#ffffff', 20, 0.8);
+                
+                camera.position.x += (Math.random() - 0.5) * 1.5; 
+                camera.position.y += (Math.random() - 0.5) * 1.5;
+                return;
+            }
+
+            const c1 = p1.pos.clone(); const c2 = p2.pos.clone();
+            const hit1 = t1.distanceTo(c2) < 2.0; const hit2 = t2.distanceTo(c1) < 2.0;
+
+            if (hit1 && hit2) {
+                spawnParticles(c1.x, c1.y, p1.color, 30, 1.0); spawnParticles(c2.x, c2.y, p2.color, 30, 1.0);
+                startRound("DRAW!");
+            } else if (hit1) {
+                spawnParticles(c2.x, c2.y, p2.color, 40, 1.2); p1.score++;
+                if (p1.score >= GAME.maxScore) endGame("PLAYER 1", p1.color); else startRound("P1 SCORES!");
+            } else if (hit2) {
+                spawnParticles(c1.x, c1.y, p1.color, 40, 1.2); p2.score++;
+                if (p2.score >= GAME.maxScore) endGame("AI", "#3b82f6"); else startRound("P2 SCORES!");
+            }
+
+            if (!hit1 && !hit2 && c1.distanceTo(c2) < 3.5) {
+                const push = (p1.pos.x - p2.pos.x) > 0 ? 0.2 : -0.2;
+                p1.vel.x += push; p2.vel.x -= push;
+                spawnParticles((c1.x+c2.x)/2, (c1.y+c2.y)/2, '#aaaaaa', 5, 0.3);
+            }
+        }
+
+        // --- 7. INPUT HANDLING ---
+
+        window.addEventListener('keydown', e => {
+            if (e.code === 'KeyA') INPUT.left = true; if (e.code === 'KeyD') INPUT.right = true;
+            if (e.code === 'KeyW' || e.code === 'Space') INPUT.jump = true; if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') INPUT.boost = true;
+        });
+        window.addEventListener('keyup', e => {
+            if (e.code === 'KeyA') INPUT.left = false; if (e.code === 'KeyD') INPUT.right = false;
+            if (e.code === 'KeyW' || e.code === 'Space') INPUT.jump = false; if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') INPUT.boost = false;
+        });
+
+        function getMappedTouch(touch) {
+            if (!isRotated) return { clientX: touch.clientX, clientY: touch.clientY, identifier: touch.identifier };
+            return { clientX: touch.clientY, clientY: physicalW - touch.clientX, identifier: touch.identifier };
+        }
+
+        const joyBase = document.getElementById('joystick-base');
+        const joyStick = document.getElementById('joystick-stick');
+        const joyArea = document.getElementById('joystick-area');
+        
+        let joyActive = false; 
+        let joyOrigin = {x: 0, y: 0};
+        let joyTouchId = null;
+
+        joyArea.addEventListener('touchstart', e => {
+            e.preventDefault();
+            if (joyActive) return; 
+            
+            const touch = getMappedTouch(e.changedTouches[0]);
+            joyTouchId = touch.identifier;
+            joyActive = true; 
+            joyOrigin.x = touch.clientX; joyOrigin.y = touch.clientY;
+            
+            joyBase.style.display = 'block';
+            joyBase.style.left = touch.clientX + 'px'; joyBase.style.top = touch.clientY + 'px';
+            joyStick.style.left = '50%'; joyStick.style.top = '50%';
+            joyStick.style.transform = `translate(-50%, -50%)`;
+            
+            INPUT.joyActive = true;
+            INPUT.joyX = 0; INPUT.joyY = 0;
+        });
+
+        joyArea.addEventListener('touchmove', e => {
+            e.preventDefault();
+            if (!joyActive) return;
+            
+            let touch = null;
+            for(let i=0; i < e.changedTouches.length; i++) {
+                if(e.changedTouches[i].identifier === joyTouchId) {
+                    touch = getMappedTouch(e.changedTouches[i]); break;
+                }
+            }
+            if(!touch) return; 
+
+            const dx = touch.clientX - joyOrigin.x; const dy = touch.clientY - joyOrigin.y;
+            const maxR = 40; const dist = Math.hypot(dx, dy);
+            let nx = dx, ny = dy;
+            
+            if (dist > maxR) { nx = (dx / dist) * maxR; ny = (dy / dist) * maxR; }
+            
+            joyStick.style.transform = `translate(calc(-50% + ${nx}px), calc(-50% + ${ny}px))`;
+            
+            INPUT.joyX = dx; INPUT.joyY = dy;
+            INPUT.left = dx < -20; INPUT.right = dx > 20;
+        });
+
+        function endJoy(e) { 
+            if (!joyActive) return;
+            let trackedTouchLifted = false;
+            for(let i=0; i < e.changedTouches.length; i++) {
+                if(e.changedTouches[i].identifier === joyTouchId) {
+                    trackedTouchLifted = true; break;
+                }
+            }
+            if (!trackedTouchLifted) return;
+
+            e.preventDefault(); 
+            joyActive = false; joyTouchId = null;
+            joyBase.style.display = 'none'; 
+            INPUT.left = false; INPUT.right = false; 
+            INPUT.joyActive = false; INPUT.joyX = 0; INPUT.joyY = 0;
+        }
+        
+        joyArea.addEventListener('touchend', endJoy); joyArea.addEventListener('touchcancel', endJoy);
+
+        const btnJump = document.getElementById('btn-jump'); const btnBoost = document.getElementById('btn-boost');
+        function bindBtn(el, actionName) {
+            el.addEventListener('touchstart', (e) => { e.preventDefault(); INPUT[actionName] = true; el.classList.add('active'); });
+            el.addEventListener('touchend', (e) => { e.preventDefault(); INPUT[actionName] = false; el.classList.remove('active'); });
+            el.addEventListener('touchcancel', (e) => { e.preventDefault(); INPUT[actionName] = false; el.classList.remove('active'); });
+        }
+        bindBtn(btnJump, 'jump'); bindBtn(btnBoost, 'boost');
+
+        // --- 8. MAIN LOOP ---
+        function animate() {
+            requestAnimationFrame(animate);
+            
+            if (GAME.state === 'MENU') {
+                if (p1 && p2) {
+                    p1.visualRotY += 0.02;
+                    p2.visualRotY -= 0.02;
+                    p1.updateMesh();
+                    p2.updateMesh();
+                }
+                camera.position.x += (0 - camera.position.x) * 0.1;
+                camera.position.y += (10 - camera.position.y) * 0.1;
+                camera.lookAt(0, 4, 0);
+            }
+            else if (GAME.state === 'SHOP') {
+                if (p1) {
+                    p1.visualRotY += 0.02;
+                    p1.updateMesh();
+                }
+                camera.position.x += (0 - camera.position.x) * 0.1;
+                camera.position.y += (10 - camera.position.y) * 0.1;
+                camera.lookAt(0, 4, 0);
+            }
+            else if (GAME.state === 'PLAYING' || GAME.state === 'ROUND_OVER') {
+                p1.update(INPUT.left, INPUT.right, INPUT.jump, INPUT.boost, INPUT.joyX, INPUT.joyY, INPUT.joyActive);
+                runAI(p2, p1);
+                checkCollisions(); 
+                
+                if(p1 && p2) {
+                    const midX = (p1.pos.x + p2.pos.x) / 2; 
+                    const midY = (p1.pos.y + p2.pos.y) / 2;
+                    camera.position.x += (midX * 0.3 - camera.position.x) * 0.05;
+                    camera.position.y += (Math.max(14, midY + 8) - camera.position.y) * 0.05;
+                    camera.lookAt(camera.position.x, Math.max(10, midY + 2), 0);
+                }
+            }
+            
+            updateParticles();
+            renderer.render(scene, camera);
+
+            if (GAME.state === 'PLAYING' || GAME.state === 'ROUND_OVER') {
+                updateHUD();
+            }
+        }
+
+        setupMenuCars();
+        animate();
+
+    </script>
+</body>
+</html>
+
 
