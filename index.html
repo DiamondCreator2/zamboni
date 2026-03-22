@@ -132,33 +132,57 @@
                 <span id="round-text" class="text-white font-black text-5xl md:text-7xl uppercase tracking-widest text-center transform scale-150 opacity-0 transition-all duration-300 neon-text" style="color: #fff;">FIGHT!</span>
             </div>
 
-            <!-- Main Menu -->
-            <div id="main-menu" class="absolute inset-0 flex justify-center items-center z-20 transition-opacity duration-300 pointer-events-none">
-                <div class="glass-panel p-6 rounded-3xl border border-gray-700 shadow-2xl flex flex-col items-center text-center max-w-sm w-[90%] pointer-events-auto">
-                    <h1 class="text-4xl md:text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-red-500 via-purple-500 to-blue-500 mb-1 uppercase tracking-tighter" style="filter: drop-shadow(0 0 8px rgba(168,85,247,0.5));">
+            <!-- Main Menu (Restructured for Sliding) -->
+            <div id="main-menu" class="absolute inset-0 z-20 pointer-events-none" style="padding: max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));">
+                
+                <!-- Title / Hints (Top Left) -->
+                <div id="menu-left" class="absolute top-6 left-6 sm:top-10 sm:left-10 pointer-events-auto transition-transform duration-500 ease-in-out transform translate-x-0">
+                    <h1 class="text-5xl md:text-7xl font-black text-transparent bg-clip-text bg-gradient-to-r from-red-500 via-purple-500 to-blue-500 mb-1 uppercase tracking-tighter" style="filter: drop-shadow(0 0 8px rgba(168,85,247,0.5));">
                         Zamboni
                     </h1>
-                    <h2 class="text-2xl md:text-3xl font-bold text-white mb-6 tracking-widest uppercase neon-text" style="color: #e2e8f0;">Jousting</h2>
+                    <h2 class="text-3xl md:text-4xl font-bold text-white mb-6 tracking-widest uppercase neon-text" style="color: #e2e8f0;">Jousting</h2>
                     
-                    <button onclick="startGame()" class="w-full bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-bold py-3 px-6 rounded-xl text-lg transition transform hover:scale-105 shadow-[0_0_20px_rgba(99,102,241,0.6)] border-b-4 border-indigo-900 mb-3 cursor-pointer">
-                        PLAY VS AI
+                    <div class="text-sm text-gray-400 glass-panel p-4 rounded-2xl border border-gray-700 max-w-[220px] hidden sm:block">
+                        <strong class="text-gray-200 block mb-2">Controls:</strong>
+                        A/D: Drive & Turn<br>
+                        W/S: Tilt Midair<br>
+                        Space: Jump<br>
+                        Shift: Boost
+                    </div>
+                </div>
+
+                <!-- Buttons (Bottom Right) -->
+                <div id="menu-right" class="absolute bottom-6 right-6 sm:bottom-10 sm:right-10 flex flex-col gap-4 items-end pointer-events-auto w-48 sm:w-64 transition-transform duration-500 ease-in-out transform translate-x-0">
+                    <button onclick="startGame()" class="w-full bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-bold py-3 sm:py-4 px-4 sm:px-6 rounded-xl sm:rounded-2xl text-lg sm:text-xl transition transform hover:scale-105 shadow-[0_0_20px_rgba(99,102,241,0.6)] border-b-4 border-indigo-900 cursor-pointer flex justify-between items-center">
+                        <span>PLAY</span>
+                        <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6 sm:w-8 sm:h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                     </button>
 
-                    <button onclick="openShop()" class="w-full bg-gradient-to-r from-yellow-600 to-orange-600 hover:from-yellow-500 hover:to-orange-500 text-white font-bold py-3 px-6 rounded-xl text-lg transition transform hover:scale-105 shadow-[0_0_20px_rgba(245,158,11,0.5)] border-b-4 border-yellow-900 mb-4 cursor-pointer">
-                        ZAMBONI SHOP
+                    <button onclick="openShop()" class="w-full bg-gradient-to-r from-yellow-600 to-orange-600 hover:from-yellow-500 hover:to-orange-500 text-white font-bold py-3 sm:py-4 px-4 sm:px-6 rounded-xl sm:rounded-2xl text-lg sm:text-xl transition transform hover:scale-105 shadow-[0_0_20px_rgba(245,158,11,0.5)] border-b-4 border-yellow-900 cursor-pointer flex justify-between items-center">
+                        <span>SHOP</span>
+                        <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6 sm:w-8 sm:h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
                     </button>
 
-                    <div class="text-xs text-gray-500 desktop-hint">
-                        <strong class="text-gray-300">Desktop:</strong> A/D to Drive/Turn | W/S to Tilt Midair | W to Jump | Shift to Boost
-                    </div>
-                    <div class="text-xs text-gray-400 md:hidden">
-                        First to 5 wins.
-                    </div>
+                    <button onclick="openSettings()" class="w-full bg-gradient-to-r from-gray-600 to-gray-500 hover:from-gray-500 hover:to-gray-400 text-white font-bold py-3 sm:py-4 px-4 sm:px-6 rounded-xl sm:rounded-2xl text-lg sm:text-xl transition transform hover:scale-105 shadow-[0_0_15px_rgba(156,163,175,0.5)] border-b-4 border-gray-800 cursor-pointer flex justify-between items-center">
+                        <span>SETTINGS</span>
+                        <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 sm:w-7 sm:h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                    </button>
                 </div>
             </div>
 
-            <!-- Zamboni Shop (With dedicated 2nd 3D renderer overlay) -->
-            <div id="shop-menu" class="absolute inset-0 bg-black bg-opacity-80 backdrop-blur-md z-40 hidden flex-col md:flex-row transition-opacity duration-300 pointer-events-none">
+            <!-- Settings Menu -->
+            <div id="settings-menu" class="absolute inset-0 bg-black bg-opacity-80 backdrop-blur-md z-40 hidden flex-col items-center justify-center transition-opacity duration-500 opacity-0 pointer-events-none">
+                <div class="glass-panel p-8 rounded-3xl border border-gray-700 shadow-2xl text-center w-[90%] max-w-sm pointer-events-auto">
+                    <h2 class="text-3xl md:text-4xl font-black text-white mb-6 uppercase tracking-wider drop-shadow-md">SETTINGS</h2>
+                    <p class="text-gray-400 mb-8 italic">Settings panel coming soon...</p>
+                    <button onclick="closeSettings()" class="w-full bg-gray-700 hover:bg-gray-600 text-white font-bold py-3 px-10 rounded-xl text-xl transition transform hover:scale-105 shadow-lg border-b-4 border-gray-800 cursor-pointer">
+                        BACK
+                    </button>
+                </div>
+            </div>
+
+            <!-- Zamboni Shop (Overlay with zoom animation) -->
+            <div id="shop-menu" class="absolute inset-0 z-40 hidden flex-col transition-opacity duration-500 opacity-0 pointer-events-none">
                 
                 <!-- Shop Header -->
                 <div class="absolute top-0 left-0 w-full flex justify-start items-start z-50 pointer-events-none" style="padding: max(16px, env(safe-area-inset-top)) 0 0 max(16px, env(safe-area-inset-left));">
@@ -170,41 +194,31 @@
                     </button>
                 </div>
 
-                <!-- True Side-by-Side Flexbox Layout -->
-                <div class="flex flex-row w-full h-full max-w-6xl mx-auto items-center pt-16 pb-4">
-                    
-                    <!-- Left Side: Info Card -->
-                    <div class="w-[45%] h-full flex items-center justify-end pr-2 sm:pr-8 pointer-events-none">
-                        <div class="glass-panel p-4 sm:p-8 rounded-3xl flex flex-col w-full max-w-sm pointer-events-auto border border-gray-700 shadow-2xl">
-                            <h1 class="text-sm sm:text-xl font-bold text-gray-400 mb-1">ZAMBONI SHOP</h1>
-                            <h2 id="shop-item-name" class="text-3xl sm:text-5xl font-black mb-2 sm:mb-4 uppercase">NAME</h2>
-                            <div class="bg-gray-900 bg-opacity-60 p-3 sm:p-5 rounded-xl border border-gray-800 mb-4 sm:mb-6 min-h-[60px] sm:min-h-[90px] flex items-center shadow-inner">
-                                <p id="shop-item-desc" class="text-gray-300 italic text-xs sm:text-base leading-relaxed text-center w-full">Desc</p>
-                            </div>
-                            <div id="shop-item-action"></div>
-                        </div>
-                    </div>
-
-                    <!-- Right Side: Secondary 3D Scene Overlay & Navigation Arrows -->
-                    <div class="w-[55%] h-full max-h-[500px] relative flex items-center justify-between px-2 sm:px-6 pointer-events-none">
-                        
-                        <button onclick="prevShopItem()" class="pointer-events-auto bg-black bg-opacity-60 hover:bg-opacity-90 text-white rounded-full w-10 h-10 sm:w-14 sm:h-14 flex items-center justify-center border-2 border-gray-500 transition transform hover:scale-110 shadow-[0_0_15px_rgba(0,0,0,0.8)] cursor-pointer z-10">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6 sm:w-8 sm:h-8" viewBox="0 0 20 20" fill="currentColor">
-                                <path fill-rule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clip-rule="evenodd" />
-                            </svg>
-                        </button>
-                        
-                        <!-- Dedicated DOM container for the Shop's 3D Renderer -->
-                        <div id="shop-3d-container" class="absolute inset-0 w-full h-full z-0 pointer-events-none"></div>
-                        
-                        <button onclick="nextShopItem()" class="pointer-events-auto bg-black bg-opacity-60 hover:bg-opacity-90 text-white rounded-full w-10 h-10 sm:w-14 sm:h-14 flex items-center justify-center border-2 border-gray-500 transition transform hover:scale-110 shadow-[0_0_15px_rgba(0,0,0,0.8)] cursor-pointer z-10">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6 sm:w-8 sm:h-8" viewBox="0 0 20 20" fill="currentColor">
-                                <path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd" />
-                            </svg>
-                        </button>
-
-                    </div>
+                <!-- Action Button Top Center -->
+                <div class="absolute top-24 sm:top-28 left-1/2 transform -translate-x-1/2 w-[90%] max-w-xs pointer-events-none z-20 flex justify-center">
+                    <div id="shop-item-action" class="w-full pointer-events-auto shadow-2xl rounded-xl"></div>
                 </div>
+
+                <!-- Navigation Arrows -->
+                <div class="absolute inset-0 flex items-center justify-between px-4 sm:px-24 pointer-events-none z-10">
+                    <button onclick="prevShopItem()" class="pointer-events-auto bg-black bg-opacity-60 hover:bg-opacity-90 text-white rounded-full w-12 h-12 sm:w-16 sm:h-16 flex items-center justify-center border-2 border-gray-500 transition transform hover:scale-110 shadow-[0_0_15px_rgba(0,0,0,0.8)] cursor-pointer">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6 sm:w-8 sm:h-8" viewBox="0 0 20 20" fill="currentColor">
+                            <path fill-rule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clip-rule="evenodd" />
+                        </svg>
+                    </button>
+                    <button onclick="nextShopItem()" class="pointer-events-auto bg-black bg-opacity-60 hover:bg-opacity-90 text-white rounded-full w-12 h-12 sm:w-16 sm:h-16 flex items-center justify-center border-2 border-gray-500 transition transform hover:scale-110 shadow-[0_0_15px_rgba(0,0,0,0.8)] cursor-pointer">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6 sm:w-8 sm:h-8" viewBox="0 0 20 20" fill="currentColor">
+                            <path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd" />
+                        </svg>
+                    </button>
+                </div>
+
+                <!-- Info Card Bottom Center -->
+                <div class="absolute bottom-8 left-1/2 transform -translate-x-1/2 w-[90%] max-w-lg pointer-events-none z-20 flex flex-col items-center">
+                    <h2 id="shop-item-name" class="text-4xl sm:text-5xl font-black uppercase text-center drop-shadow-[0_4px_4px_rgba(0,0,0,1)] mb-2">NAME</h2>
+                    <p id="shop-item-desc" class="text-gray-200 font-medium italic text-base sm:text-lg leading-relaxed text-center drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)] w-full">Desc</p>
+                </div>
+
             </div>
 
             <!-- Game Over Screen -->
@@ -236,17 +250,18 @@
 
         // --- 1. GAME CONSTANTS & STATE ---
         const GAME = {
-            state: 'MENU', // MENU, SHOP, PLAYING, ROUND_OVER, GAME_OVER
+            state: 'MENU', // MENU, SHOP, SETTINGS, PLAYING, ROUND_OVER, GAME_OVER
             width: window.innerWidth,
             height: window.innerHeight,
             maxScore: 5,
             arena: { width: 40, height: 25 },
             gravity: 0.014, // Slightly higher for punchier jumps
-            dt: 1
+            dt: 1,
+            testingMode: false
         };
 
         const INPUT = { 
-            left: false, right: false, jump: false, down: false, boost: false,
+            left: false, right: false, jump: false, up: false, down: false, boost: false,
             joyX: 0, joyY: 0, joyActive: false 
         };
 
@@ -254,6 +269,7 @@
             wrapper: document.getElementById('main-wrapper'),
             menu: document.getElementById('main-menu'),
             shop: document.getElementById('shop-menu'),
+            settings: document.getElementById('settings-menu'),
             hud: document.getElementById('hud'),
             gameOver: document.getElementById('game-over'),
             pucksDisplay: document.getElementById('pucks-display'),
@@ -273,6 +289,7 @@
 
         const isMobileDevice = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0) || (window.innerWidth <= 768);
 
+        // Track the current round sequence to prevent overlapping countdowns
         let currentRoundId = 0;
 
         // --- 1.5 PLAYER DATA & SHOP SYSTEM ---
@@ -289,6 +306,10 @@
         ];
 
         let currentShopIndex = 0;
+
+        // Shared Camera Interpolation vectors
+        const currentLookAt = new THREE.Vector3(0, 4, 0);
+        const targetLookAt = new THREE.Vector3(0, 4, 0);
 
         function getSelectedCarColor() {
             const item = SHOP_ITEMS.find(i => i.id === PLAYER_DATA.selected);
@@ -337,22 +358,68 @@
             currentShopIndex = SHOP_ITEMS.findIndex(i => i.id === PLAYER_DATA.selected);
             if(currentShopIndex === -1) currentShopIndex = 0;
             
-            UI.menu.classList.add('hidden');
+            // Slide out menu
+            document.getElementById('menu-left').classList.replace('translate-x-0', '-translate-x-[150%]');
+            document.getElementById('menu-right').classList.replace('translate-x-0', 'translate-x-[150%]');
+            
             UI.shop.classList.remove('hidden');
             UI.shop.classList.add('flex');
+            setTimeout(() => {
+                UI.shop.classList.replace('opacity-0', 'opacity-100');
+                UI.shop.classList.add('pointer-events-auto');
+            }, 50);
             
             updateShopUI();
             setupShopCar();
-            resizeShopCanvas(); 
         }
 
         function closeShop() {
             GAME.state = 'MENU';
-            UI.shop.classList.add('hidden');
-            UI.shop.classList.remove('flex');
-            UI.menu.classList.remove('hidden');
+            
+            UI.shop.classList.replace('opacity-100', 'opacity-0');
+            UI.shop.classList.remove('pointer-events-auto');
+            
+            setTimeout(() => {
+                UI.shop.classList.add('hidden');
+                UI.shop.classList.remove('flex');
+            }, 500);
+            
+            // Slide in menu
+            document.getElementById('menu-left').classList.replace('-translate-x-[150%]', 'translate-x-0');
+            document.getElementById('menu-right').classList.replace('translate-x-[150%]', 'translate-x-0');
             
             setupMenuCars();
+        }
+
+        function openSettings() {
+            GAME.state = 'SETTINGS';
+            
+            // Slide out menu
+            document.getElementById('menu-left').classList.replace('translate-x-0', '-translate-x-[150%]');
+            document.getElementById('menu-right').classList.replace('translate-x-0', 'translate-x-[150%]');
+
+            UI.settings.classList.remove('hidden');
+            UI.settings.classList.add('flex');
+            setTimeout(() => {
+                UI.settings.classList.replace('opacity-0', 'opacity-100');
+                UI.settings.classList.add('pointer-events-auto');
+            }, 50);
+        }
+
+        function closeSettings() {
+            GAME.state = 'MENU';
+            
+            UI.settings.classList.replace('opacity-100', 'opacity-0');
+            UI.settings.classList.remove('pointer-events-auto');
+            
+            setTimeout(() => {
+                UI.settings.classList.add('hidden');
+                UI.settings.classList.remove('flex');
+            }, 500);
+
+            // Slide in menu
+            document.getElementById('menu-left').classList.replace('-translate-x-[150%]', 'translate-x-0');
+            document.getElementById('menu-right').classList.replace('translate-x-[150%]', 'translate-x-0');
         }
 
         function buyCar(id) {
@@ -412,25 +479,8 @@
                 camera.updateProjectionMatrix();
                 renderer.setSize(GAME.width, GAME.height);
             }
-
-            if (GAME.state === 'SHOP') {
-                resizeShopCanvas();
-            }
         }
         
-        function resizeShopCanvas() {
-            const container = document.getElementById('shop-3d-container');
-            if (container && shopCamera && shopRenderer) {
-                const w = container.clientWidth;
-                const h = container.clientHeight;
-                if (w > 0 && h > 0) {
-                    shopCamera.aspect = w / h;
-                    shopCamera.updateProjectionMatrix();
-                    shopRenderer.setSize(w, h);
-                }
-            }
-        }
-
         window.addEventListener('resize', handleResize);
         handleResize();
 
@@ -441,7 +491,7 @@
 
         camera = new THREE.PerspectiveCamera(35, GAME.width / GAME.height, 0.1, 1000);
         camera.position.set(0, 16, 60); 
-        camera.lookAt(0, 12, 0);
+        camera.lookAt(currentLookAt);
 
         renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
         renderer.setSize(GAME.width, GAME.height);
@@ -455,27 +505,6 @@
         const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
         dirLight.position.set(0, 30, 10);
         scene.add(dirLight);
-
-        // --- 2.5 THREE.JS SETUP (SHOP SECONDARY CANVAS) ---
-        const shopDOMContainer = document.getElementById('shop-3d-container');
-        const shopScene = new THREE.Scene();
-        shopCamera = new THREE.PerspectiveCamera(40, 1, 0.1, 1000);
-        shopCamera.position.set(0, 4, 18); 
-        shopCamera.lookAt(0, 1.5, 0);
-
-        shopRenderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-        shopRenderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-        shopRenderer.toneMapping = THREE.ACESFilmicToneMapping;
-        shopRenderer.toneMappingExposure = 1.0; 
-        shopDOMContainer.appendChild(shopRenderer.domElement);
-
-        const shopAmbientLight = new THREE.AmbientLight(0xd0e0ff, 1.2); 
-        shopScene.add(shopAmbientLight);
-        const shopDirLight = new THREE.DirectionalLight(0xffffff, 1.0);
-        shopDirLight.position.set(5, 10, 10);
-        shopScene.add(shopDirLight);
-
-        let shopZamboni = null;
 
         // --- 3. ICE RINK ENVIRONMENT BUILDER ---
         const arenaGroup = new THREE.Group();
@@ -693,13 +722,13 @@
                 );
             }
 
-            update(inputLeft, inputRight, inputJump, inputDown, inputBoost, joyX, joyY, joyActive) {
+            update(inputLeft, inputRight, inputJump, inputUp, inputDown, inputBoost, joyX, joyY, joyActive) {
                 // Let physics fall naturally even during round transitions!
                 if (GAME.state === 'MENU' || GAME.state === 'SHOP') return;
                 
                 // But block all control inputs during the countdown freeze
                 if (GAME.state === 'ROUND_OVER') {
-                    inputLeft = false; inputRight = false; inputJump = false; inputDown = false; inputBoost = false;
+                    inputLeft = false; inputRight = false; inputJump = false; inputUp = false; inputDown = false; inputBoost = false;
                     joyActive = false; joyX = 0; joyY = 0;
                 }
 
@@ -751,24 +780,9 @@
 
                         this.angle += diffPitch * 0.25; 
                         this.angularVel = 0; 
-                    } else if (this.isP1 && INPUT.useMouse) {
-                        // ** PC MOUSE AIMING FIX **
-                        const dx = INPUT.worldMouseX - this.pos.x;
-                        const dy = INPUT.worldMouseY - this.pos.y;
-                        let targetPitch = Math.atan2(dy, Math.abs(dx));
-                        if (this.facingLeft) {
-                            targetPitch = Math.PI - Math.atan2(dy, -dx);
-                        }
-                        
-                        let diffPitch = targetPitch - this.angle;
-                        while(diffPitch > Math.PI) diffPitch -= Math.PI*2;
-                        while(diffPitch < -Math.PI) diffPitch += Math.PI*2;
-
-                        this.angle += diffPitch * 0.25; 
-                        this.angularVel = 0; 
                     } else if (!joyActive) {
-                        // Keyboard: W (Jump) rotates up, S (Down) rotates down
-                        if (inputJump) this.angularVel += 0.015;
+                        // Keyboard: W (Up) rotates up, S (Down) rotates down
+                        if (inputUp) this.angularVel += 0.015;
                         if (inputDown) this.angularVel -= 0.015;
                         this.angle += this.angularVel;
                         this.angularVel *= 0.90;
@@ -875,39 +889,46 @@
         let p1, p2;
 
         function runAI(ai, opponent) {
-            let left = false, right = false, jump = false, down = false, boost = false;
+            let left = false, right = false, jump = false, up = false, down = false, boost = false;
             let joyActive = false, joyX = 0, joyY = 0;
 
-            const dx = opponent.pos.x - ai.pos.x; 
-            const dy = opponent.pos.y - ai.pos.y;
-            const dist = Math.hypot(dx, dy);
+            if (!GAME.testingMode) {
+                const dx = opponent.pos.x - ai.pos.x; 
+                const dy = opponent.pos.y - ai.pos.y;
+                const dist = Math.hypot(dx, dy);
 
-            if (ai.isGrounded) {
-                if (dx > 2) right = true; else if (dx < -2) left = true;
-                if (opponent.pos.y > 4 && dist < 15 && Math.random() < 0.05) jump = true;
-                if (dist < 10 && Math.random() < 0.02) jump = true;
-            } else {
-                joyActive = true;
-                joyX = dx;
-                joyY = -dy; 
-                if (dx < -2) left = true; else if (dx > 2) right = true;
-                
-                let targetAngle = Math.atan2(dy, dx);
-                let lanceAngle = ai.facingLeft ? (Math.PI - ai.angle) : ai.angle;
-                
-                let angleDiff = targetAngle - lanceAngle;
-                while(angleDiff > Math.PI) angleDiff -= Math.PI*2;
-                while(angleDiff < -Math.PI) angleDiff += Math.PI*2;
+                if (ai.isGrounded) {
+                    if (dx > 2) right = true; else if (dx < -2) left = true;
+                    
+                    // Chase airborne players more aggressively
+                    if (opponent.pos.y > 4 && dist < 15 && Math.random() < 0.08) jump = true;
+                    // Jump much more frequently in close quarters, even if player is grounded
+                    if (dist < 12 && Math.random() < 0.05) jump = true;
+                    // Randomly jump for unpredictability
+                    if (Math.random() < 0.008) jump = true;
+                } else {
+                    joyActive = true;
+                    joyX = dx;
+                    joyY = -dy; 
+                    if (dx < -2) left = true; else if (dx > 2) right = true;
+                    
+                    let targetAngle = Math.atan2(dy, dx);
+                    let lanceAngle = ai.facingLeft ? (Math.PI - ai.angle) : ai.angle;
+                    
+                    let angleDiff = targetAngle - lanceAngle;
+                    while(angleDiff > Math.PI) angleDiff -= Math.PI*2;
+                    while(angleDiff < -Math.PI) angleDiff += Math.PI*2;
 
-                if (Math.abs(angleDiff) < 0.5 && dist > 5 && ai.boostFuel > 20) boost = true;
+                    if (Math.abs(angleDiff) < 0.5 && dist > 5 && ai.boostFuel > 20) boost = true;
+                }
             }
             
             // AI obeys countdown rule too
-            if (GAME.state === 'ROUND_OVER') {
-                left = right = jump = down = boost = joyActive = false;
+            if (GAME.state === 'ROUND_OVER' || GAME.testingMode) {
+                left = right = jump = up = down = boost = joyActive = false;
             }
             
-            ai.update(left, right, jump, down, boost, joyX, joyY, joyActive);
+            ai.update(left, right, jump, up, down, boost, joyX, joyY, joyActive);
         }
 
         // --- 6. GAME LOGIC & COUNTDOWN ---
@@ -925,12 +946,13 @@
         }
 
         function setupShopCar() {
-            if(shopZamboni) { shopScene.remove(shopZamboni.yawGroup); shopZamboni = null; }
+            // Update p1 model instantly to preview shop item, leave p2 alone
+            if(p1) { scene.remove(p1.yawGroup); p1=null; }
             const item = SHOP_ITEMS[currentShopIndex];
             
-            shopZamboni = new Zamboni(true, item.color, shopScene);
-            shopZamboni.pos.set(0, 1.25); 
-            shopZamboni.updateMesh();
+            p1 = new Zamboni(true, item.color, scene);
+            p1.pos.set(-6, 1.25); // Remains in P1's native position!
+            p1.updateMesh();
         }
 
         function startGame() {
@@ -938,6 +960,10 @@
 
             if(p1) { scene.remove(p1.yawGroup); }
             if(p2) { scene.remove(p2.yawGroup); }
+            
+            // Slide out menu instantly
+            document.getElementById('menu-left').classList.replace('translate-x-0', '-translate-x-[150%]');
+            document.getElementById('menu-right').classList.replace('translate-x-0', 'translate-x-[150%]');
             
             p1 = new Zamboni(true, getSelectedCarColor(), scene); 
             p2 = new Zamboni(false, '#3b82f6', scene);
@@ -955,21 +981,23 @@
 
             if (isMobileDevice) { UI.mobileControls.style.display = 'block'; }
             
+            // Kick off countdown with no initial message delay
             triggerRoundEnd(null);
         }
 
         async function triggerRoundEnd(msgText) {
             let activeRound = ++currentRoundId;
-            GAME.state = 'ROUND_OVER'; 
+            GAME.state = 'ROUND_OVER'; // Freezes inputs & physics, leaves models frozen in air!
             
+            // Show score message and pause so players see the hit
             if (msgText) {
                 UI.msgText.innerText = msgText; 
                 UI.msgText.style.color = '#fff';
                 UI.msgText.style.opacity = 1; 
                 UI.msgText.style.transform = "scale(1)";
                 
-                await sleep(1500); // Admire the explosion while bodies slide uncontrollably
-                if (activeRound !== currentRoundId) return; 
+                await sleep(1500); // Dramatic freeze frame
+                if (activeRound !== currentRoundId) return; // Exit if another game started
                 
                 UI.msgText.style.opacity = 0; 
                 UI.msgText.style.transform = "scale(1.5)";
@@ -978,7 +1006,7 @@
             
             if (activeRound !== currentRoundId) return;
             
-            // Snap back to starting line for new round!
+            // Reset to starting line
             p1.reset(); p2.reset();
             particles.forEach(p => scene.remove(p.mesh)); particles.length = 0;
 
@@ -996,12 +1024,14 @@
                 await sleep(300);
             };
 
-            await animateText("3", "#ef4444"); 
-            await animateText("2", "#f59e0b"); 
-            await animateText("1", "#10b981"); 
+            // Racing countdown!
+            await animateText("3", "#ef4444"); // Red
+            await animateText("2", "#f59e0b"); // Yellow
+            await animateText("1", "#10b981"); // Green
             
             if (activeRound !== currentRoundId) return;
             
+            // Unfreeze inputs!
             UI.msgText.innerText = "FIGHT!";
             UI.msgText.style.color = "#fff";
             UI.msgText.style.opacity = 1;
@@ -1016,7 +1046,7 @@
         }
 
         function endGame(winnerName, colorHexStr) {
-            currentRoundId++; 
+            currentRoundId++; // Cancels any running countdowns immediately
             GAME.state = 'GAME_OVER';
             UI.winnerText.innerText = `${winnerName} WINS!`; 
             UI.winnerText.style.color = colorHexStr;
@@ -1034,13 +1064,18 @@
         }
 
         function returnToMenu() {
-            currentRoundId++; 
+            currentRoundId++; // Cancel countdowns
             GAME.state = 'MENU';
             UI.gameOver.classList.add('hidden'); 
             UI.hud.classList.add('hidden'); 
             UI.menu.classList.remove('hidden');
             UI.pucksDisplay.classList.remove('hidden');
             UI.mobileControls.style.display = 'none';
+            
+            // Slide in menu
+            document.getElementById('menu-left').classList.replace('-translate-x-[150%]', 'translate-x-0');
+            document.getElementById('menu-right').classList.replace('translate-x-[150%]', 'translate-x-0');
+            
             setupMenuCars();
         }
 
@@ -1068,6 +1103,7 @@
                 p2.vel.y = -Math.sin(p2.angle) * 0.5;
                 spawnParticles((t1.x+t2.x)/2, (t1.y+t2.y)/2, '#ffffff', 20, 0.8);
                 
+                // Shake camera
                 camera.position.x += (Math.random() - 0.5) * 1.5; 
                 camera.position.y += (Math.random() - 0.5) * 1.5;
                 return;
@@ -1101,9 +1137,13 @@
             if (['Space', 'KeyW', 'KeyS', 'KeyA', 'KeyD', 'ShiftLeft', 'ShiftRight'].includes(e.code)) {
                 e.preventDefault();
             }
+            if (e.code === 'Digit0') {
+                GAME.testingMode = !GAME.testingMode;
+            }
             if (e.code === 'KeyA') INPUT.left = true; 
             if (e.code === 'KeyD') INPUT.right = true;
-            if (e.code === 'KeyW' || e.code === 'Space') INPUT.jump = true; 
+            if (e.code === 'Space') INPUT.jump = true; 
+            if (e.code === 'KeyW') INPUT.up = true; 
             if (e.code === 'KeyS') INPUT.down = true; 
             if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') INPUT.boost = true;
         }, {passive: false});
@@ -1111,7 +1151,8 @@
         window.addEventListener('keyup', e => {
             if (e.code === 'KeyA') INPUT.left = false; 
             if (e.code === 'KeyD') INPUT.right = false;
-            if (e.code === 'KeyW' || e.code === 'Space') INPUT.jump = false; 
+            if (e.code === 'Space') INPUT.jump = false; 
+            if (e.code === 'KeyW') INPUT.up = false; 
             if (e.code === 'KeyS') INPUT.down = false; 
             if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') INPUT.boost = false;
         });
@@ -1201,54 +1242,53 @@
         // --- 8. MAIN LOOP ---
         function animate() {
             requestAnimationFrame(animate);
-
-            if (GAME.state === 'MENU') {
+            
+            if (GAME.state === 'MENU' || GAME.state === 'SETTINGS') {
                 if (p1 && p2) {
                     p1.visualRotY += 0.02;
                     p2.visualRotY -= 0.02;
                     p1.updateMesh(); p2.updateMesh();
                 }
-                camera.position.x += (0 - camera.position.x) * 0.1;
-                camera.position.y += (10 - camera.position.y) * 0.1;
-                camera.lookAt(0, 4, 0);
+                
+                // Target generic menu view
+                camera.position.lerp(new THREE.Vector3(0, 16, 60), 0.05);
+                targetLookAt.set(0, 8, 0);
             }
             else if (GAME.state === 'SHOP') {
+                // Background cars keep spinning!
                 if (p1 && p2) {
                     p1.visualRotY += 0.02;
                     p2.visualRotY -= 0.02;
                     p1.updateMesh(); p2.updateMesh();
                 }
-                if (shopZamboni) {
-                    shopZamboni.visualRotY += 0.02;
-                    shopZamboni.updateMesh();
-                }
-                camera.position.x += (0 - camera.position.x) * 0.1;
-                camera.position.y += (10 - camera.position.y) * 0.1;
-                camera.lookAt(0, 4, 0);
+                
+                // Zoom in deeply on P1!
+                const isMobile = GAME.width < 768;
+                camera.position.lerp(new THREE.Vector3(-6, 5, isMobile ? 35 : 25), 0.05);
+                targetLookAt.set(-6, 2.5, 0);
             }
             else if (GAME.state === 'PLAYING' || GAME.state === 'ROUND_OVER') {
-                p1.update(INPUT.left, INPUT.right, INPUT.jump, INPUT.down, INPUT.boost, INPUT.joyX, INPUT.joyY, INPUT.joyActive);
+                // If ROUND_OVER, inputs are blocked, but we still render the current frozen position
+                p1.update(INPUT.left, INPUT.right, INPUT.jump, INPUT.up, INPUT.down, INPUT.boost, INPUT.joyX, INPUT.joyY, INPUT.joyActive);
                 runAI(p2, p1);
                 
                 if (GAME.state === 'PLAYING') {
-                    checkCollisions(); 
+                    checkCollisions(); // Don't allow multiple hits during freeze frame
                 }
                 
                 if(p1 && p2) {
                     const midX = (p1.pos.x + p2.pos.x) / 2; 
                     const midY = (p1.pos.y + p2.pos.y) / 2;
-                    camera.position.x += (midX * 0.3 - camera.position.x) * 0.05;
-                    camera.position.y += (Math.max(14, midY + 8) - camera.position.y) * 0.1;
-                    camera.lookAt(camera.position.x, Math.max(10, midY + 2), 0);
+                    camera.position.lerp(new THREE.Vector3(midX * 0.3, Math.max(14, midY + 8), 60), 0.1);
+                    targetLookAt.set(camera.position.x, Math.max(10, midY + 2), 0);
                 }
             }
             
+            currentLookAt.lerp(targetLookAt, 0.1);
+            camera.lookAt(currentLookAt);
+
             updateParticles();
             renderer.render(scene, camera);
-            
-            if (GAME.state === 'SHOP' && shopRenderer) {
-                shopRenderer.render(shopScene, shopCamera);
-            }
 
             if (GAME.state === 'PLAYING' || GAME.state === 'ROUND_OVER') {
                 updateHUD();
