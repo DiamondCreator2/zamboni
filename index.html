@@ -149,7 +149,7 @@
                     </button>
 
                     <div class="text-xs text-gray-500 desktop-hint">
-                        <strong class="text-gray-300">Desktop:</strong> A/D to Aim | W to Jump | SHIFT to Boost
+                        <strong class="text-gray-300">Desktop:</strong> A/D to Drive/Turn | W/S to Tilt Midair | W to Jump | Shift to Boost
                     </div>
                     <div class="text-xs text-gray-400 md:hidden">
                         First to 5 wins.
@@ -241,12 +241,12 @@
             height: window.innerHeight,
             maxScore: 5,
             arena: { width: 40, height: 25 },
-            gravity: 0.012,
+            gravity: 0.014, // Slightly higher for punchier jumps
             dt: 1
         };
 
         const INPUT = { 
-            left: false, right: false, jump: false, boost: false,
+            left: false, right: false, jump: false, down: false, boost: false,
             joyX: 0, joyY: 0, joyActive: false 
         };
 
@@ -273,7 +273,6 @@
 
         const isMobileDevice = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0) || (window.innerWidth <= 768);
 
-        // Track the current round sequence to prevent overlapping countdowns
         let currentRoundId = 0;
 
         // --- 1.5 PLAYER DATA & SHOP SYSTEM ---
@@ -614,10 +613,10 @@
                 this.boostDelay = 0;
                 this.score = 0;
                 
-                this.accel = 0.04;
-                this.airAccel = 0.01;
-                this.jumpForce = 0.45;
-                this.boostForce = 0.035;
+                this.accel = 0.06; // Snappier start
+                this.airAccel = 0.015;
+                this.jumpForce = 0.48; // Compensates for slightly higher gravity
+                this.boostForce = 0.045; // Punchier boost
                 
                 this.buildMesh();
             }
@@ -694,15 +693,17 @@
                 );
             }
 
-            update(inputLeft, inputRight, inputJump, inputBoost, joyX, joyY, joyActive) {
-                // If game is in countdown or freeze, don't process inputs, just let physics run
-                if (GAME.state !== 'PLAYING' && GAME.state !== 'ROUND_OVER') return;
+            update(inputLeft, inputRight, inputJump, inputDown, inputBoost, joyX, joyY, joyActive) {
+                // Let physics fall naturally even during round transitions!
+                if (GAME.state === 'MENU' || GAME.state === 'SHOP') return;
                 
+                // But block all control inputs during the countdown freeze
                 if (GAME.state === 'ROUND_OVER') {
-                    inputLeft = false; inputRight = false; inputJump = false; inputBoost = false;
+                    inputLeft = false; inputRight = false; inputJump = false; inputDown = false; inputBoost = false;
                     joyActive = false; joyX = 0; joyY = 0;
                 }
 
+                // Aiming Logic (Joystick / Keyboard)
                 if (joyActive) {
                     if (joyX < -10) this.facingLeft = true;
                     else if (joyX > 10) this.facingLeft = false;
@@ -724,7 +725,7 @@
 
                 if (this.isGrounded) {
                     this.vel.x += driveInput * this.accel;
-                    this.vel.x *= 0.92; 
+                    this.vel.x *= 0.88; // Snappier ground friction (was 0.92)
                     
                     const visualUpDot = Math.cos(this.angle);
                     let targetFlat = visualUpDot > 0 ? 0 : Math.PI;
@@ -739,6 +740,7 @@
                         spawnParticles(this.pos.x, 0, '#cceeff', 10, 0.2, 20); 
                     }
                 } else {
+                    // Airborne Rotation
                     if (joyActive && Math.hypot(joyX, joyY) > 10) {
                         let joyAngle = Math.atan2(-joyY, joyX); 
                         let targetPitch = this.facingLeft ? (Math.PI - joyAngle) : joyAngle;
@@ -749,16 +751,33 @@
 
                         this.angle += diffPitch * 0.25; 
                         this.angularVel = 0; 
+                    } else if (this.isP1 && INPUT.useMouse) {
+                        // ** PC MOUSE AIMING FIX **
+                        const dx = INPUT.worldMouseX - this.pos.x;
+                        const dy = INPUT.worldMouseY - this.pos.y;
+                        let targetPitch = Math.atan2(dy, Math.abs(dx));
+                        if (this.facingLeft) {
+                            targetPitch = Math.PI - Math.atan2(dy, -dx);
+                        }
+                        
+                        let diffPitch = targetPitch - this.angle;
+                        while(diffPitch > Math.PI) diffPitch -= Math.PI*2;
+                        while(diffPitch < -Math.PI) diffPitch += Math.PI*2;
+
+                        this.angle += diffPitch * 0.25; 
+                        this.angularVel = 0; 
                     } else if (!joyActive) {
-                        if (inputLeft) this.angularVel += 0.015;
-                        if (inputRight) this.angularVel -= 0.015;
+                        // Keyboard: W (Jump) rotates up, S (Down) rotates down
+                        if (inputJump) this.angularVel += 0.015;
+                        if (inputDown) this.angularVel -= 0.015;
                         this.angle += this.angularVel;
-                        this.angularVel *= 0.95;
+                        this.angularVel *= 0.90;
                     }
                     
                     this.vel.x += driveInput * this.airAccel;
                 }
 
+                // APPLY GRAVITY TO Y VELOCITY
                 this.vel.y -= GAME.gravity;
 
                 // --- BOOST LOGIC (Cleaning Ice to Recharge) ---
@@ -856,7 +875,7 @@
         let p1, p2;
 
         function runAI(ai, opponent) {
-            let left = false, right = false, jump = false, boost = false;
+            let left = false, right = false, jump = false, down = false, boost = false;
             let joyActive = false, joyX = 0, joyY = 0;
 
             const dx = opponent.pos.x - ai.pos.x; 
@@ -883,12 +902,12 @@
                 if (Math.abs(angleDiff) < 0.5 && dist > 5 && ai.boostFuel > 20) boost = true;
             }
             
-            // Block input for AI too if round is over
+            // AI obeys countdown rule too
             if (GAME.state === 'ROUND_OVER') {
-                left = right = jump = boost = joyActive = false;
+                left = right = jump = down = boost = joyActive = false;
             }
             
-            ai.update(left, right, jump, boost, joyX, joyY, joyActive);
+            ai.update(left, right, jump, down, boost, joyX, joyY, joyActive);
         }
 
         // --- 6. GAME LOGIC & COUNTDOWN ---
@@ -949,7 +968,7 @@
                 UI.msgText.style.opacity = 1; 
                 UI.msgText.style.transform = "scale(1)";
                 
-                await sleep(1500); 
+                await sleep(1500); // Admire the explosion while bodies slide uncontrollably
                 if (activeRound !== currentRoundId) return; 
                 
                 UI.msgText.style.opacity = 0; 
@@ -959,6 +978,7 @@
             
             if (activeRound !== currentRoundId) return;
             
+            // Snap back to starting line for new round!
             p1.reset(); p2.reset();
             particles.forEach(p => scene.remove(p.mesh)); particles.length = 0;
 
@@ -1076,13 +1096,24 @@
 
         // --- 7. INPUT HANDLING ---
 
+        // Prevent Spacebar scrolling bug on PC!
         window.addEventListener('keydown', e => {
-            if (e.code === 'KeyA') INPUT.left = true; if (e.code === 'KeyD') INPUT.right = true;
-            if (e.code === 'KeyW' || e.code === 'Space') INPUT.jump = true; if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') INPUT.boost = true;
-        });
+            if (['Space', 'KeyW', 'KeyS', 'KeyA', 'KeyD', 'ShiftLeft', 'ShiftRight'].includes(e.code)) {
+                e.preventDefault();
+            }
+            if (e.code === 'KeyA') INPUT.left = true; 
+            if (e.code === 'KeyD') INPUT.right = true;
+            if (e.code === 'KeyW' || e.code === 'Space') INPUT.jump = true; 
+            if (e.code === 'KeyS') INPUT.down = true; 
+            if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') INPUT.boost = true;
+        }, {passive: false});
+
         window.addEventListener('keyup', e => {
-            if (e.code === 'KeyA') INPUT.left = false; if (e.code === 'KeyD') INPUT.right = false;
-            if (e.code === 'KeyW' || e.code === 'Space') INPUT.jump = false; if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') INPUT.boost = false;
+            if (e.code === 'KeyA') INPUT.left = false; 
+            if (e.code === 'KeyD') INPUT.right = false;
+            if (e.code === 'KeyW' || e.code === 'Space') INPUT.jump = false; 
+            if (e.code === 'KeyS') INPUT.down = false; 
+            if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') INPUT.boost = false;
         });
 
         function getMappedTouch(touch) {
@@ -1170,13 +1201,12 @@
         // --- 8. MAIN LOOP ---
         function animate() {
             requestAnimationFrame(animate);
-            
+
             if (GAME.state === 'MENU') {
                 if (p1 && p2) {
                     p1.visualRotY += 0.02;
                     p2.visualRotY -= 0.02;
-                    p1.updateMesh();
-                    p2.updateMesh();
+                    p1.updateMesh(); p2.updateMesh();
                 }
                 camera.position.x += (0 - camera.position.x) * 0.1;
                 camera.position.y += (10 - camera.position.y) * 0.1;
@@ -1197,7 +1227,7 @@
                 camera.lookAt(0, 4, 0);
             }
             else if (GAME.state === 'PLAYING' || GAME.state === 'ROUND_OVER') {
-                p1.update(INPUT.left, INPUT.right, INPUT.jump, INPUT.boost, INPUT.joyX, INPUT.joyY, INPUT.joyActive);
+                p1.update(INPUT.left, INPUT.right, INPUT.jump, INPUT.down, INPUT.boost, INPUT.joyX, INPUT.joyY, INPUT.joyActive);
                 runAI(p2, p1);
                 
                 if (GAME.state === 'PLAYING') {
@@ -1231,4 +1261,3 @@
     </script>
 </body>
 </html>
-
